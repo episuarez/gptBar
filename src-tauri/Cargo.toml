@@ -1,0 +1,89 @@
+[package]
+name = "gptbar"
+version = "0.1.0"
+description = "A cross-platform system tray application to monitor your AI API usage"
+authors = ["episuarez"]
+edition = "2021"
+license = "GPL-3.0"
+repository = "https://github.com/episuarez/gptBar"
+homepage = "https://github.com/episuarez/gptBar"
+readme = "../README.md"
+keywords = ["ai", "usage-monitor", "claude", "openai", "tauri"]
+categories = ["gui", "api-bindings"]
+
+[lib]
+name = "gptbar_lib"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# Tauri
+tauri = { version = "2", features = ["tray-icon", "image-ico", "image-png"] }
+tauri-plugin-opener = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-shell = "2"
+tauri-plugin-process = "2"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Async runtime
+tokio = { version = "1", features = ["full", "sync"] }
+
+# HTTP client
+reqwest = { version = "0.12", features = ["json", "cookies", "rustls-tls"], default-features = false }
+
+# Secure storage
+keyring = "3"
+
+# Database (for cookies)
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+# Date/Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Async traits
+async-trait = "0.1"
+
+# Secure memory
+zeroize = { version = "1", features = ["derive"] }
+
+# Base64 encoding
+base64 = "0.22"
+
+# AES-GCM encryption (for Chrome v10/v11 cookies)
+aes-gcm = "0.10"
+
+# Open URLs in browser
+opener = "0.7"
+
+# Cancellation tokens for agents
+tokio-util = { version = "0.7", features = ["rt"] }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Security_Cryptography",
+    "Win32_Foundation",
+    "Win32_System_Memory"
+] }
+
+[dev-dependencies]
+# Testing
+mockall = "0.13"
+wiremock = "0.6"
+tokio-test = "0.4"
+tempfile = "3"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

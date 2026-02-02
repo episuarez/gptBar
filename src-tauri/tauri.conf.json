@@ -1,0 +1,49 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "GPTBar",
+  "version": "0.1.0",
+  "identifier": "com.episuarez.gptbar",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "GPTBar",
+        "width": 300,
+        "height": 520,
+        "resizable": false,
+        "center": false,
+        "decorations": false,
+        "transparent": false,
+        "visible": false,
+        "skipTaskbar": true,
+        "alwaysOnTop": true,
+        "focus": false
+      }
+    ],
+"security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "shortDescription": "Monitor AI provider usage from your system tray",
+    "longDescription": "GPTBar is a Windows application for monitoring Claude and other AI provider usage, inspired by the macOS app CodexBar.",
+    "category": "Utility",
+    "publisher": "episuarez",
+    "copyright": "Copyright (c) 2024 episuarez"
+  }
+}

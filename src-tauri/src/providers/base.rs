@@ -58,6 +58,16 @@ impl RateWindow {
     pub fn is_critical(&self) -> bool {
         self.used_percent >= 95.0
     }
+
+    /// Returns true if usage is at or above the given warning threshold
+    pub fn is_warning_at(&self, threshold: f64) -> bool {
+        self.used_percent >= threshold
+    }
+
+    /// Returns true if usage is at or above the given critical threshold
+    pub fn is_critical_at(&self, threshold: f64) -> bool {
+        self.used_percent >= threshold
+    }
 }
 
 impl Default for RateWindow {
@@ -423,5 +433,27 @@ mod tests {
 
         assert_eq!(snapshot.primary, deserialized.primary);
         assert_eq!(snapshot.identity, deserialized.identity);
+    }
+
+    #[test]
+    fn test_rate_window_is_warning_at_custom() {
+        let window = RateWindow::new(89.0);
+        // With default 80% threshold
+        assert!(window.is_warning_at(80.0));
+        // With custom 90% threshold
+        assert!(!window.is_warning_at(90.0));
+        // Exactly at threshold
+        assert!(RateWindow::new(90.0).is_warning_at(90.0));
+    }
+
+    #[test]
+    fn test_rate_window_is_critical_at_custom() {
+        let window = RateWindow::new(99.0);
+        // With default 95% threshold
+        assert!(window.is_critical_at(95.0));
+        // With 100% threshold
+        assert!(!window.is_critical_at(100.0));
+        // Exactly at 100%
+        assert!(RateWindow::new(100.0).is_critical_at(100.0));
     }
 }

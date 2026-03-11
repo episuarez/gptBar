@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6C5CE7"/>
+      <stop offset="100%" style="stop-color:#0984E3"/>
+    </linearGradient>
+    <linearGradient id="bar1" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" style="stop-color:#00B894"/>
+      <stop offset="100%" style="stop-color:#55EFC4"/>
+    </linearGradient>
+    <linearGradient id="bar2" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" style="stop-color:#FDCB6E"/>
+      <stop offset="100%" style="stop-color:#FFEAA7"/>
+    </linearGradient>
+    <linearGradient id="bar3" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" style="stop-color:#E17055"/>
+      <stop offset="100%" style="stop-color:#FAB1A0"/>
+    </linearGradient>
+    <linearGradient id="spark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFF"/>
+      <stop offset="100%" style="stop-color:#DFE6E9"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect x="16" y="16" width="480" height="480" rx="96" ry="96" fill="url(#bg)"/>
+
+  <!-- Subtle inner shadow -->
+  <rect x="16" y="16" width="480" height="480" rx="96" ry="96" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="4"/>
+
+  <!-- Three usage bars -->
+  <!-- Bar 1 (green) - 90% height -->
+  <rect x="100" y="148" width="72" height="248" rx="12" ry="12" fill="rgba(0,0,0,0.2)"/>
+  <rect x="100" y="172" width="72" height="224" rx="12" ry="12" fill="url(#bar1)"/>
+
+  <!-- Bar 2 (yellow) - 65% height -->
+  <rect x="220" y="148" width="72" height="248" rx="12" ry="12" fill="rgba(0,0,0,0.2)"/>
+  <rect x="220" y="234" width="72" height="162" rx="12" ry="12" fill="url(#bar2)"/>
+
+  <!-- Bar 3 (orange/red) - 40% height -->
+  <rect x="340" y="148" width="72" height="248" rx="12" ry="12" fill="rgba(0,0,0,0.2)"/>
+  <rect x="340" y="297" width="72" height="99" rx="12" ry="12" fill="url(#bar3)"/>
+
+  <!-- AI spark/brain symbol at top -->
+  <!-- Central dot -->
+  <circle cx="256" cy="88" r="14" fill="url(#spark)" opacity="0.95"/>
+  <!-- Radiating lines -->
+  <line x1="256" y1="62" x2="256" y2="50" stroke="white" stroke-width="5" stroke-linecap="round" opacity="0.8"/>
+  <line x1="276" y1="70" x2="284" y2="60" stroke="white" stroke-width="5" stroke-linecap="round" opacity="0.7"/>
+  <line x1="236" y1="70" x2="228" y2="60" stroke="white" stroke-width="5" stroke-linecap="round" opacity="0.7"/>
+  <line x1="282" y1="88" x2="292" y2="88" stroke="white" stroke-width="5" stroke-linecap="round" opacity="0.6"/>
+  <line x1="230" y1="88" x2="220" y2="88" stroke="white" stroke-width="5" stroke-linecap="round" opacity="0.6"/>
+
+  <!-- Percentage labels under bars -->
+  <text x="136" y="432" fill="white" font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="700" text-anchor="middle" opacity="0.9">90</text>
+  <text x="256" y="432" fill="white" font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="700" text-anchor="middle" opacity="0.9">65</text>
+  <text x="376" y="432" fill="white" font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="700" text-anchor="middle" opacity="0.9">40</text>
+
+  <!-- % symbols -->
+  <text x="160" y="432" fill="white" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="400" text-anchor="start" opacity="0.6">%</text>
+  <text x="280" y="432" fill="white" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="400" text-anchor="start" opacity="0.6">%</text>
+  <text x="400" y="432" fill="white" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="400" text-anchor="start" opacity="0.6">%</text>
+</svg>

@@ -111,12 +111,16 @@ pub fn save_config(config: AppConfig) -> Result<(), String> {
     Ok(())
 }
 
-/// Sets the refresh interval
+/// Sets the refresh interval.
+///
+/// Returns an optional warning message if the interval is below the recommended minimum.
 #[tauri::command]
-pub fn set_refresh_interval(minutes: u32) -> Result<(), String> {
+pub fn set_refresh_interval(minutes: u32) -> Result<Option<String>, String> {
     let mut config = AppConfig::load();
     config.refresh_interval = minutes;
-    config.save()
+    let warning = config.validate_refresh_interval();
+    config.save()?;
+    Ok(warning)
 }
 
 /// Sets whether to start on login
@@ -132,6 +136,28 @@ pub fn set_start_on_login(enabled: bool) -> Result<(), String> {
 #[tauri::command]
 pub fn is_autostart_enabled() -> bool {
     AppConfig::is_autostart_enabled()
+}
+
+/// Sets the notification thresholds (warning and critical percentages)
+#[tauri::command]
+pub fn set_notification_thresholds(warning: f64, critical: f64) -> Result<(), String> {
+    if warning < 0.0 || warning > 100.0 || critical < 0.0 || critical > 100.0 {
+        return Err("Thresholds must be between 0 and 100".to_string());
+    }
+    if warning >= critical {
+        return Err("Warning threshold must be lower than critical threshold".to_string());
+    }
+    let mut config = AppConfig::load();
+    config.warning_threshold = warning;
+    config.critical_threshold = critical;
+    config.save()
+}
+
+/// Gets the current notification thresholds
+#[tauri::command]
+pub fn get_notification_thresholds() -> Result<(f64, f64), String> {
+    let config = AppConfig::load();
+    Ok((config.warning_threshold, config.critical_threshold))
 }
 
 // ============================================================================

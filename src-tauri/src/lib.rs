@@ -65,7 +65,7 @@ impl AppState {
         let agent_manager = AgentManager::new();
 
         // Create and register agents
-        let refresh = Arc::new(RefreshAgent::with_interval(5)); // 5 minute refresh
+        let refresh = Arc::new(RefreshAgent::with_interval(10)); // 10 minute refresh
         let notification = Arc::new(NotificationAgent::new());
 
         // Add all providers to refresh agent
@@ -231,6 +231,8 @@ pub fn run() {
             commands::set_refresh_interval,
             commands::set_start_on_login,
             commands::is_autostart_enabled,
+            commands::set_notification_thresholds,
+            commands::get_notification_thresholds,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

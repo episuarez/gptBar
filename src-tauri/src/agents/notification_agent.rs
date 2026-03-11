@@ -29,8 +29,8 @@ pub struct NotificationThresholds {
 impl Default for NotificationThresholds {
     fn default() -> Self {
         Self {
-            warning_percent: 80.0,
-            critical_percent: 95.0,
+            warning_percent: 90.0,
+            critical_percent: 100.0,
             cooldown_minutes: 30,
         }
     }
@@ -121,23 +121,40 @@ impl NotificationAgent {
         self.check_and_notify(provider_id, snapshot).await;
     }
 
-    /// Checks a snapshot against thresholds and sends notification if needed
+    /// Checks a snapshot against thresholds and sends notification if needed.
+    ///
+    /// Checks each window (primary, secondary, tertiary) independently so the user
+    /// knows exactly which limit is being approached.
     async fn check_and_notify(&self, provider_id: &str, snapshot: &UsageSnapshot) {
-        // Get the highest usage across all windows
-        let max_usage = snapshot.max_usage();
+        let windows: Vec<(&str, Option<&crate::providers::RateWindow>)> = vec![
+            ("primary", snapshot.primary.as_ref()),
+            ("secondary", snapshot.secondary.as_ref()),
+            ("tertiary", snapshot.tertiary.as_ref()),
+        ];
 
-        let level = if max_usage >= self.thresholds.critical_percent {
-            Some(NotificationLevel::Critical)
-        } else if max_usage >= self.thresholds.warning_percent {
-            Some(NotificationLevel::Warning)
-        } else {
-            None
-        };
+        for (window_name, window) in windows {
+            if let Some(w) = window {
+                let level = if w.is_critical_at(self.thresholds.critical_percent) {
+                    Some(NotificationLevel::Critical)
+                } else if w.is_warning_at(self.thresholds.warning_percent) {
+                    Some(NotificationLevel::Warning)
+                } else {
+                    None
+                };
 
-        if let Some(level) = level {
-            // Check cooldown
-            if self.should_notify(provider_id).await {
-                self.send_notification(provider_id, max_usage, level).await;
+                if let Some(level) = level {
+                    // Use a composite key for cooldown: provider + window
+                    let cooldown_key = format!("{}:{}", provider_id, window_name);
+                    if self.should_notify(&cooldown_key).await {
+                        self.send_window_notification(
+                            provider_id,
+                            window_name,
+                            w,
+                            level,
+                        )
+                        .await;
+                    }
+                }
             }
         }
     }
@@ -158,13 +175,32 @@ impl NotificationAgent {
         true
     }
 
-    /// Sends a notification
-    async fn send_notification(&self, provider_id: &str, usage: f64, level: NotificationLevel) {
-        // Update last notification time
+    /// Sends a notification for a specific rate window
+    async fn send_window_notification(
+        &self,
+        provider_id: &str,
+        window_name: &str,
+        window: &crate::providers::RateWindow,
+        level: NotificationLevel,
+    ) {
+        // Update last notification time using composite key
+        let cooldown_key = format!("{}:{}", provider_id, window_name);
         self.last_notifications
             .write()
             .await
-            .insert(provider_id.to_string(), Utc::now());
+            .insert(cooldown_key, Utc::now());
+
+        // Build a human-readable window description
+        let window_desc = if let Some(minutes) = window.window_minutes {
+            let hours = minutes / 60;
+            if hours > 0 {
+                format!("{} ({}h)", window_name, hours)
+            } else {
+                format!("{} ({}min)", window_name, minutes)
+            }
+        } else {
+            window_name.to_string()
+        };
 
         // Format the message
         let title = match level {
@@ -172,15 +208,16 @@ impl NotificationAgent {
             NotificationLevel::Critical => format!("{} Usage Critical!", provider_id),
         };
 
-        let message = format!("Usage is at {:.1}%", usage);
+        let message = format!("{} usage is at {:.1}%", window_desc, window.used_percent);
 
         tracing::info!(
-            "Sending {} notification for {}: {}",
+            "Sending {} notification for {} [{}]: {}",
             match level {
                 NotificationLevel::Warning => "warning",
                 NotificationLevel::Critical => "critical",
             },
             provider_id,
+            window_name,
             message
         );
 
@@ -280,8 +317,8 @@ mod tests {
     #[test]
     fn test_notification_thresholds_default() {
         let thresholds = NotificationThresholds::default();
-        assert_eq!(thresholds.warning_percent, 80.0);
-        assert_eq!(thresholds.critical_percent, 95.0);
+        assert_eq!(thresholds.warning_percent, 90.0);
+        assert_eq!(thresholds.critical_percent, 100.0);
         assert_eq!(thresholds.cooldown_minutes, 30);
     }
 
@@ -303,7 +340,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_notification_agent_warning() {
-        let agent = NotificationAgent::new();
+        let agent = NotificationAgent::new(); // default warning=90%
         let notify_count = Arc::new(AtomicU32::new(0));
         let notify_count_clone = notify_count.clone();
 
@@ -313,8 +350,8 @@ mod tests {
             })
             .await;
 
-        // Update with a warning-level snapshot
-        let snapshot = UsageSnapshot::new().with_primary(RateWindow::new(85.0));
+        // Update with a warning-level snapshot (>= 90%)
+        let snapshot = UsageSnapshot::new().with_primary(RateWindow::new(92.0));
         agent.update_snapshot("test-provider", &snapshot).await;
 
         assert_eq!(notify_count.load(Ordering::SeqCst), 1);
@@ -322,7 +359,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_notification_agent_critical() {
-        let agent = NotificationAgent::new();
+        let agent = NotificationAgent::new(); // default critical=100%
         let last_level = Arc::new(RwLock::new(None));
         let last_level_clone = last_level.clone();
 
@@ -335,8 +372,8 @@ mod tests {
             })
             .await;
 
-        // Update with a critical-level snapshot
-        let snapshot = UsageSnapshot::new().with_primary(RateWindow::new(98.0));
+        // Update with a critical-level snapshot (100% to match default critical threshold)
+        let snapshot = UsageSnapshot::new().with_primary(RateWindow::new(100.0));
         agent.update_snapshot("test-provider", &snapshot).await;
 
         // Give async callback time to run
@@ -368,7 +405,7 @@ mod tests {
     #[tokio::test]
     async fn test_notification_agent_cooldown() {
         // Use a very short cooldown for testing
-        let thresholds = NotificationThresholds::new(80.0, 95.0).with_cooldown(1); // 1 minute
+        let thresholds = NotificationThresholds::new(90.0, 100.0).with_cooldown(1); // 1 minute
         let agent = NotificationAgent::with_thresholds(thresholds);
         let notify_count = Arc::new(AtomicU32::new(0));
         let notify_count_clone = notify_count.clone();
@@ -380,7 +417,7 @@ mod tests {
             .await;
 
         // First notification should go through
-        let snapshot = UsageSnapshot::new().with_primary(RateWindow::new(85.0));
+        let snapshot = UsageSnapshot::new().with_primary(RateWindow::new(92.0));
         agent.update_snapshot("test-provider", &snapshot).await;
         assert_eq!(notify_count.load(Ordering::SeqCst), 1);
 
@@ -401,7 +438,7 @@ mod tests {
             })
             .await;
 
-        let snapshot = UsageSnapshot::new().with_primary(RateWindow::new(85.0));
+        let snapshot = UsageSnapshot::new().with_primary(RateWindow::new(92.0));
 
         // First notification
         agent.update_snapshot("test-provider", &snapshot).await;
@@ -427,12 +464,171 @@ mod tests {
             })
             .await;
 
-        let snapshot = UsageSnapshot::new().with_primary(RateWindow::new(85.0));
+        let snapshot = UsageSnapshot::new().with_primary(RateWindow::new(92.0));
 
         // Different providers should not affect each other's cooldown
         agent.update_snapshot("provider-1", &snapshot).await;
         agent.update_snapshot("provider-2", &snapshot).await;
 
         assert_eq!(notify_count.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn test_notification_per_window_primary() {
+        let thresholds = NotificationThresholds::new(90.0, 100.0);
+        let agent = NotificationAgent::with_thresholds(thresholds);
+        let messages = Arc::new(RwLock::new(Vec::<String>::new()));
+        let messages_clone = messages.clone();
+
+        agent
+            .on_notify(move |title, message, _level| {
+                let messages = messages_clone.clone();
+                let entry = format!("{}: {}", title, message);
+                tokio::spawn(async move {
+                    messages.write().await.push(entry);
+                });
+            })
+            .await;
+
+        // Only primary exceeds threshold
+        let snapshot = UsageSnapshot::new()
+            .with_primary(RateWindow::new(92.0))
+            .with_secondary(RateWindow::new(50.0));
+        agent.update_snapshot("claude", &snapshot).await;
+
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        let msgs = messages.read().await;
+        assert!(!msgs.is_empty(), "Should have sent a notification for primary window");
+    }
+
+    #[tokio::test]
+    async fn test_notification_per_window_secondary() {
+        let thresholds = NotificationThresholds::new(90.0, 100.0);
+        let agent = NotificationAgent::with_thresholds(thresholds);
+        let messages = Arc::new(RwLock::new(Vec::<String>::new()));
+        let messages_clone = messages.clone();
+
+        agent
+            .on_notify(move |title, message, _level| {
+                let messages = messages_clone.clone();
+                let entry = format!("{}: {}", title, message);
+                tokio::spawn(async move {
+                    messages.write().await.push(entry);
+                });
+            })
+            .await;
+
+        // Only secondary exceeds threshold
+        let snapshot = UsageSnapshot::new()
+            .with_primary(RateWindow::new(50.0))
+            .with_secondary(RateWindow::new(95.0));
+        agent.update_snapshot("claude", &snapshot).await;
+
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        let msgs = messages.read().await;
+        assert!(!msgs.is_empty(), "Should have sent a notification for secondary window");
+    }
+
+    #[tokio::test]
+    async fn test_notification_per_window_tertiary() {
+        let thresholds = NotificationThresholds::new(90.0, 100.0);
+        let agent = NotificationAgent::with_thresholds(thresholds);
+        let messages = Arc::new(RwLock::new(Vec::<String>::new()));
+        let messages_clone = messages.clone();
+
+        agent
+            .on_notify(move |title, message, _level| {
+                let messages = messages_clone.clone();
+                let entry = format!("{}: {}", title, message);
+                tokio::spawn(async move {
+                    messages.write().await.push(entry);
+                });
+            })
+            .await;
+
+        // Only tertiary exceeds threshold
+        let snapshot = UsageSnapshot::new()
+            .with_primary(RateWindow::new(30.0))
+            .with_tertiary(RateWindow::new(91.0));
+        agent.update_snapshot("claude", &snapshot).await;
+
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        let msgs = messages.read().await;
+        assert!(!msgs.is_empty(), "Should have sent a notification for tertiary window");
+    }
+
+    #[tokio::test]
+    async fn test_notification_includes_window_name() {
+        let thresholds = NotificationThresholds::new(90.0, 100.0);
+        let agent = NotificationAgent::with_thresholds(thresholds);
+        let messages = Arc::new(RwLock::new(Vec::<String>::new()));
+        let messages_clone = messages.clone();
+
+        agent
+            .on_notify(move |_title, message, _level| {
+                let messages = messages_clone.clone();
+                let msg = message.to_string();
+                tokio::spawn(async move {
+                    messages.write().await.push(msg);
+                });
+            })
+            .await;
+
+        let snapshot = UsageSnapshot::new()
+            .with_primary(RateWindow::new(92.0).with_window_minutes(300))
+            .with_secondary(RateWindow::new(50.0));
+        agent.update_snapshot("claude", &snapshot).await;
+
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        let msgs = messages.read().await;
+        // Message should include which window triggered (e.g. "primary" or window description)
+        assert!(
+            msgs.iter().any(|m| m.contains("primary") || m.contains("5h") || m.contains("300")),
+            "Notification message should identify the window. Got: {:?}",
+            *msgs
+        );
+    }
+
+    #[tokio::test]
+    async fn test_notification_at_100_percent() {
+        let agent = NotificationAgent::new(); // default: warning=90, critical=100
+        let last_level = Arc::new(RwLock::new(None));
+        let last_level_clone = last_level.clone();
+
+        agent
+            .on_notify(move |_title, _message, level| {
+                let last_level = last_level_clone.clone();
+                tokio::spawn(async move {
+                    *last_level.write().await = Some(level);
+                });
+            })
+            .await;
+
+        let snapshot = UsageSnapshot::new().with_primary(RateWindow::new(100.0));
+        agent.update_snapshot("claude", &snapshot).await;
+
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        let level = *last_level.read().await;
+        assert_eq!(level, Some(NotificationLevel::Critical));
+    }
+
+    #[tokio::test]
+    async fn test_notification_custom_warning_threshold() {
+        // User sets warning at 85%
+        let thresholds = NotificationThresholds::new(85.0, 100.0);
+        let agent = NotificationAgent::with_thresholds(thresholds);
+        let notify_count = Arc::new(AtomicU32::new(0));
+        let notify_count_clone = notify_count.clone();
+
+        agent
+            .on_notify(move |_title, _message, _level| {
+                notify_count_clone.fetch_add(1, Ordering::SeqCst);
+            })
+            .await;
+
+        // 86% should trigger with 85% threshold
+        let snapshot = UsageSnapshot::new().with_primary(RateWindow::new(86.0));
+        agent.update_snapshot("test", &snapshot).await;
+        assert_eq!(notify_count.load(Ordering::SeqCst), 1);
     }
 }

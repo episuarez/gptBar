@@ -31,10 +31,24 @@ pub struct AppConfig {
     /// Per-provider settings
     #[serde(default)]
     pub provider_settings: HashMap<String, ProviderSettings>,
+    /// Usage percentage that triggers a warning notification (default: 90%)
+    #[serde(default = "default_warning_threshold")]
+    pub warning_threshold: f64,
+    /// Usage percentage that triggers a critical notification (default: 100%)
+    #[serde(default = "default_critical_threshold")]
+    pub critical_threshold: f64,
 }
 
 fn default_enabled_providers() -> Vec<String> {
     vec!["claude".to_string()]
+}
+
+fn default_warning_threshold() -> f64 {
+    90.0
+}
+
+fn default_critical_threshold() -> f64 {
+    100.0
 }
 
 impl Default for AppConfig {
@@ -49,10 +63,12 @@ impl Default for AppConfig {
         );
 
         Self {
-            refresh_interval: 5,
+            refresh_interval: 10,
             start_on_login: false,
             enabled_providers: default_enabled_providers(),
             provider_settings,
+            warning_threshold: default_warning_threshold(),
+            critical_threshold: default_critical_threshold(),
         }
     }
 }
@@ -127,6 +143,21 @@ impl AppConfig {
     /// Check if a provider is enabled
     pub fn is_provider_enabled(&self, provider_id: &str) -> bool {
         self.enabled_providers.contains(&provider_id.to_string())
+    }
+
+    /// Validates the refresh interval and returns a warning message if it's too low.
+    ///
+    /// Intervals below 10 minutes may cause rate limiting from providers.
+    pub fn validate_refresh_interval(&self) -> Option<String> {
+        if self.refresh_interval < 10 {
+            Some(format!(
+                "Un intervalo de {} minutos podría provocar errores por demasiadas peticiones. \
+                 Se recomienda un mínimo de 10 minutos para evitar límites de tasa de las APIs.",
+                self.refresh_interval
+            ))
+        } else {
+            None
+        }
     }
 
     /// Get API key for a provider
@@ -339,9 +370,59 @@ mod tests {
     #[test]
     fn test_default_config() {
         let config = AppConfig::default();
-        assert_eq!(config.refresh_interval, 5);
+        assert_eq!(config.refresh_interval, 10);
         assert!(!config.start_on_login);
         assert!(config.enabled_providers.contains(&"claude".to_string()));
+    }
+
+    #[test]
+    fn test_default_config_notification_thresholds() {
+        let config = AppConfig::default();
+        assert_eq!(config.warning_threshold, 90.0);
+        assert_eq!(config.critical_threshold, 100.0);
+    }
+
+    #[test]
+    fn test_serialize_deserialize_with_thresholds() {
+        let mut config = AppConfig::default();
+        config.warning_threshold = 85.0;
+        config.critical_threshold = 98.0;
+
+        let json = serde_json::to_string(&config).unwrap();
+        let loaded: AppConfig = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(loaded.warning_threshold, 85.0);
+        assert_eq!(loaded.critical_threshold, 98.0);
+    }
+
+    #[test]
+    fn test_config_backward_compatible() {
+        // JSON without the new fields should deserialize with defaults
+        let json = r#"{
+            "refresh_interval": 5,
+            "start_on_login": false,
+            "enabled_providers": ["claude"],
+            "provider_settings": {}
+        }"#;
+        let config: AppConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.warning_threshold, 90.0);
+        assert_eq!(config.critical_threshold, 100.0);
+    }
+
+    #[test]
+    fn test_validate_refresh_interval_warning() {
+        let mut config = AppConfig::default();
+        config.refresh_interval = 3;
+        let warning = config.validate_refresh_interval();
+        assert!(warning.is_some());
+        assert!(warning.unwrap().contains("demasiadas peticiones"));
+    }
+
+    #[test]
+    fn test_validate_refresh_interval_ok() {
+        let config = AppConfig::default(); // 10 min
+        let warning = config.validate_refresh_interval();
+        assert!(warning.is_none());
     }
 
     #[test]

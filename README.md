@@ -1,6 +1,13 @@
-# GPTBar
+<p align="center">
+  <img src="src-tauri/icons/icon.png" width="128" height="128" alt="GPTBar Icon">
+</p>
 
-A cross-platform system tray application to monitor your AI API usage. Inspired by [CodexBar](https://github.com/steipete/CodexBar).
+<h1 align="center">GPTBar</h1>
+
+<p align="center">
+  A cross-platform system tray application to monitor your AI API usage.<br>
+  Inspired by <a href="https://github.com/steipete/CodexBar">CodexBar</a>.
+</p>
 
 ![Screenshot](docs/screenshot.png)
 
@@ -10,9 +17,10 @@ A cross-platform system tray application to monitor your AI API usage. Inspired 
 - **Cross-Platform** - Works on Windows, macOS, and Linux
 - **System Tray Integration** - Visual usage indicators in the taskbar/menu bar
 - **Session & Weekly Limits** - Monitor 5-hour session and weekly usage caps
-- **Notifications** - Get alerts when approaching usage limits (80%, 95%)
+- **Notifications** - Get alerts when approaching usage limits (configurable, default 90%/100%)
+- **Per-Window Alerts** - Independent notifications for each rate window (session, weekly, model-specific)
 - **Secure Storage** - Credentials stored using OS keyring (Windows Credential Manager, macOS Keychain, Linux Secret Service)
-- **Background Refresh** - Automatic updates every 5 minutes
+- **Background Refresh** - Automatic updates every 10 minutes (configurable, warns if < 10 min)
 - **Lightweight** - Built with Tauri for minimal resource footprint
 
 ## Supported Providers
@@ -185,7 +193,10 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-This triggers GitHub Actions to build binaries for Windows, macOS (Intel + Apple Silicon), and Linux, then uploads them to the release.
+This triggers GitHub Actions to:
+1. Generate a changelog from commits since the last tag
+2. Build binaries for Windows, macOS (Intel + Apple Silicon), and Linux
+3. Create a GitHub Release with the changelog and installers
 
 Tags with `-` (e.g., `v0.1.0-beta`) are marked as pre-release.
 

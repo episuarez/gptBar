@@ -49,4 +49,6 @@ export interface AppConfig {
   start_on_login: boolean;
   enabled_providers: string[];
   provider_settings: Record<string, ProviderSettings>;
+  warning_threshold: number;
+  critical_threshold: number;
 }

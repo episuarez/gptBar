@@ -27,7 +27,7 @@ pub struct RefreshConfig {
 impl Default for RefreshConfig {
     fn default() -> Self {
         Self {
-            interval: Duration::from_secs(5 * 60), // 5 minutes
+            interval: Duration::from_secs(10 * 60), // 10 minutes
             fetch_on_start: true,
         }
     }
@@ -297,7 +297,7 @@ mod tests {
     #[test]
     fn test_refresh_config_default() {
         let config = RefreshConfig::default();
-        assert_eq!(config.interval, Duration::from_secs(300));
+        assert_eq!(config.interval, Duration::from_secs(600)); // 10 minutes
         assert!(config.fetch_on_start);
     }
 

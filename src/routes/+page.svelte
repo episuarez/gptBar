@@ -12,6 +12,7 @@
     openai: 'OpenAI',
     gemini: 'Gemini',
     codex: 'Codex',
+    xai: 'xAI (Grok)',
   };
 
   // Provider states
@@ -21,6 +22,45 @@
 
   // Reference to close modals
   let closeModals: (() => void) | null = $state(null);
+
+  // Compute overall usage status for header dot and tray icon
+  type StatusLevel = 'normal' | 'warning' | 'critical';
+  let usageStatus = $derived.by<StatusLevel>(() => {
+    let maxPercent = 0;
+    for (const pid of enabledProviders) {
+      const s = providerStates[pid]?.snapshot;
+      if (s?.primary?.used_percent != null && s.primary.used_percent > maxPercent) {
+        maxPercent = s.primary.used_percent;
+      }
+    }
+    if (maxPercent >= 95) return 'critical';
+    if (maxPercent >= 85) return 'warning';
+    return 'normal';
+  });
+
+  // Header subtitle
+  let headerSubtitle = $derived(
+    enabledProviders.length > 1
+      ? `${enabledProviders.length} providers active`
+      : 'AI Usage Monitor'
+  );
+
+  // Update tray icon when status changes
+  $effect(() => {
+    invoke('update_tray_status', { status: usageStatus }).catch(() => {});
+  });
+
+  // Refresh from header
+  let refreshing = $state(false);
+  async function handleHeaderRefresh() {
+    if (refreshing) return;
+    refreshing = true;
+    try {
+      await handleRefresh(activeProvider);
+    } finally {
+      refreshing = false;
+    }
+  }
 
   // Get current provider state
   let currentProvider = $derived(providerStates[activeProvider] || {
@@ -172,7 +212,7 @@
 
       // Listen for focus changes to close modals (hide is handled by Rust)
       const appWindow = getCurrentWindow();
-      unlistenFocus = await appWindow.onFocusChanged(({ payload: focused }) => {
+      unlistenFocus = await appWindow.onFocusChanged(({ payload: focused }: { payload: boolean }) => {
         if (!focused && closeModals) {
           closeModals();
         }
@@ -195,6 +235,52 @@
 </script>
 
 <main class="container">
+  <header class="app-header">
+    <div class="header-left">
+      <div class="header-icon">
+        <svg viewBox="0 0 32 32" aria-hidden="true">
+          <defs>
+            <linearGradient id="hdr-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style="stop-color:#1A2332"/>
+              <stop offset="100%" style="stop-color:#0B1120"/>
+            </linearGradient>
+            <linearGradient id="hdr-bar" x1="0%" y1="100%" x2="0%" y2="0%">
+              <stop offset="0%" style="stop-color:#0891B2"/>
+              <stop offset="100%" style="stop-color:#22D3EE"/>
+            </linearGradient>
+            <linearGradient id="hdr-bar-hi" x1="0%" y1="100%" x2="0%" y2="0%">
+              <stop offset="0%" style="stop-color:#D97706"/>
+              <stop offset="100%" style="stop-color:#FBBF24"/>
+            </linearGradient>
+          </defs>
+          <rect width="32" height="32" rx="7" fill="url(#hdr-bg)"/>
+          <rect x="5" y="20" width="4" height="5" rx="1" fill="url(#hdr-bar)" opacity="0.85"/>
+          <rect x="11" y="15" width="4" height="10" rx="1" fill="url(#hdr-bar)" opacity="0.9"/>
+          <rect x="17" y="11" width="4" height="14" rx="1" fill="url(#hdr-bar)"/>
+          <rect x="23" y="8" width="4" height="17" rx="1" fill="url(#hdr-bar-hi)"/>
+        </svg>
+      </div>
+      <div class="header-text">
+        <span class="header-title">GPTBar</span>
+        <span class="header-subtitle">{headerSubtitle}</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <button
+        class="header-refresh"
+        onclick={handleHeaderRefresh}
+        disabled={refreshing}
+        title="Refresh"
+        aria-label="Refresh usage data"
+      >
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" class:spinning={refreshing}>
+          <path d="M13.65 2.35A7.96 7.96 0 0 0 8 0a8 8 0 1 0 8 8h-2a6 6 0 1 1-1.76-4.24L9 7h7V0l-2.35 2.35z" fill="currentColor"/>
+        </svg>
+      </button>
+      <div class="header-dot status-{usageStatus}"></div>
+    </div>
+  </header>
+
   {#if enabledProviders.length > 1}
     <ProviderTabs
       providers={enabledProviders}
@@ -230,18 +316,149 @@
   :global(html, body) {
     width: 100%;
     height: 100%;
-    background-color: #1a1f2e;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #0A0F1C;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     overflow: hidden;
+  }
+
+  :global(::-webkit-scrollbar) {
+    width: 4px;
+  }
+  :global(::-webkit-scrollbar-track) {
+    background: transparent;
+  }
+  :global(::-webkit-scrollbar-thumb) {
+    background: #334155;
+    border-radius: 2px;
+  }
+  :global(::-webkit-scrollbar-thumb:hover) {
+    background: #475569;
   }
 
   .container {
     width: 100%;
     height: 100vh;
-    background-color: #1a1f2e;
+    background-color: #0A0F1C;
     color: white;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+  }
+
+  .app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(34, 211, 238, 0.08);
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .header-icon {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+  }
+
+  .header-icon svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .header-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .header-title {
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: #F1F5F9;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  .header-subtitle {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 400;
+    color: #64748B;
+    line-height: 1.2;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .header-refresh {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid #1E293B;
+    background: #0F172A;
+    color: #64748B;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    padding: 0;
+  }
+
+  .header-refresh:hover {
+    color: #22D3EE;
+    border-color: rgba(34, 211, 238, 0.2);
+    background: rgba(34, 211, 238, 0.05);
+  }
+
+  .header-refresh:disabled {
+    cursor: default;
+    opacity: 0.5;
+  }
+
+  .header-refresh svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .header-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .header-dot.status-normal {
+    background: #22D3EE;
+    box-shadow: 0 0 6px rgba(34, 211, 238, 0.4);
+  }
+
+  .header-dot.status-warning {
+    background: #F59E0B;
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.4);
+  }
+
+  .header-dot.status-critical {
+    background: #EF4444;
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  :global(.spinning) {
+    animation: spin 0.8s linear infinite;
   }
 </style>

@@ -12,12 +12,16 @@ mod claude;
 mod codex;
 mod gemini;
 mod openai;
+mod xai;
+#[cfg(test)]
+mod integration_tests;
 
 pub use base::*;
 pub use claude::ClaudeProvider;
 pub use codex::CodexProvider;
 pub use gemini::GeminiProvider;
 pub use openai::OpenAIProvider;
+pub use xai::XaiProvider;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -36,6 +40,7 @@ impl ProviderRegistry {
         providers.insert("openai", Arc::new(OpenAIProvider::new()));
         providers.insert("gemini", Arc::new(GeminiProvider::new()));
         providers.insert("codex", Arc::new(CodexProvider::new()));
+        providers.insert("xai", Arc::new(XaiProvider::new()));
 
         Self { providers }
     }

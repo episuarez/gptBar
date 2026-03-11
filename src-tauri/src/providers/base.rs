@@ -223,6 +223,10 @@ pub enum ProviderError {
     #[error("Storage error: {0}")]
     Storage(String),
 
+    /// Rate limited by provider API
+    #[error("Rate limited: {0}")]
+    RateLimit(String),
+
     /// Provider is not available or disabled
     #[error("Provider not available: {0}")]
     NotAvailable(String),

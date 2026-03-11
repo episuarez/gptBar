@@ -25,6 +25,7 @@ pub mod agents;
 pub mod auth;
 mod commands;
 pub mod config;
+pub mod history;
 pub mod providers;
 pub mod security;
 
@@ -36,7 +37,7 @@ use tauri::{
 };
 
 use agents::{AgentManager, NotificationAgent, RefreshAgent};
-use providers::{ClaudeProvider, CodexProvider, GeminiProvider, OpenAIProvider, ProviderRegistry};
+use providers::{ClaudeProvider, CodexProvider, GeminiProvider, OpenAIProvider, ProviderRegistry, XaiProvider};
 
 /// Application state shared across the Tauri app
 pub struct AppState {
@@ -52,6 +53,8 @@ pub struct AppState {
     pub gemini: Arc<GeminiProvider>,
     /// Codex provider
     pub codex: Arc<CodexProvider>,
+    /// xAI (Grok) provider
+    pub xai: Arc<XaiProvider>,
 }
 
 impl AppState {
@@ -61,6 +64,7 @@ impl AppState {
         let openai = Arc::new(OpenAIProvider::new());
         let gemini = Arc::new(GeminiProvider::new());
         let codex = Arc::new(CodexProvider::new());
+        let xai = Arc::new(XaiProvider::new());
         let registry = ProviderRegistry::new();
         let agent_manager = AgentManager::new();
 
@@ -73,6 +77,7 @@ impl AppState {
         refresh.add_provider(openai.clone()).await;
         refresh.add_provider(gemini.clone()).await;
         refresh.add_provider(codex.clone()).await;
+        refresh.add_provider(xai.clone()).await;
 
         agent_manager.register(refresh).await;
         agent_manager.register(notification).await;
@@ -84,6 +89,7 @@ impl AppState {
             openai,
             gemini,
             codex,
+            xai,
         }
     }
 }
@@ -110,6 +116,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             // Create app state
             let state = tokio::runtime::Runtime::new()
@@ -138,12 +145,12 @@ pub fn run() {
                         .expect("Failed to load embedded icon")
                 });
 
-            // Window dimensions (increased for new design)
-            const WINDOW_WIDTH: i32 = 300;
-            const WINDOW_HEIGHT: i32 = 520;
+            // Initial window height — frontend calls resize_window after render
+            const WINDOW_WIDTH: i32 = 320;
+            const WINDOW_HEIGHT: i32 = 560;
             const MARGIN: i32 = 10;
 
-            let _tray = TrayIconBuilder::new()
+            let _tray = TrayIconBuilder::with_id("gptbar-tray")
                 .icon(icon)
                 .tooltip("GPTBar - Click to view usage")
                 .on_tray_icon_event(move |tray, event| {
@@ -233,6 +240,18 @@ pub fn run() {
             commands::is_autostart_enabled,
             commands::set_notification_thresholds,
             commands::get_notification_thresholds,
+            commands::set_notification_cooldown,
+            commands::get_notification_cooldown,
+            commands::set_provider_muted,
+            commands::get_muted_providers,
+            commands::update_tray_status,
+            commands::resize_window,
+            commands::get_provider_history,
+            commands::export_history_json,
+            commands::export_history_csv,
+            commands::clear_provider_history,
+            commands::check_for_updates,
+            commands::install_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

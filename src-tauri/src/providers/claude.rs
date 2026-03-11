@@ -7,9 +7,13 @@ use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::time::Instant;
 use tokio::sync::RwLock;
 
 use super::base::{AuthMethod, Provider, ProviderError, RateWindow, UsageSnapshot};
+
+/// Minimum seconds between API calls to avoid rate limiting
+const MIN_FETCH_INTERVAL_SECS: u64 = 30;
 
 /// Claude OAuth usage API response
 #[derive(Debug, Deserialize)]
@@ -95,6 +99,7 @@ pub struct ClaudeProvider {
     config: RwLock<ClaudeConfig>,
     last_snapshot: RwLock<Option<UsageSnapshot>>,
     oauth_token: RwLock<Option<String>>,
+    last_fetch_time: RwLock<Option<Instant>>,
 }
 
 impl ClaudeProvider {
@@ -110,6 +115,7 @@ impl ClaudeProvider {
             config: RwLock::new(config),
             last_snapshot: RwLock::new(None),
             oauth_token: RwLock::new(None),
+            last_fetch_time: RwLock::new(None),
         }
     }
 
@@ -244,6 +250,17 @@ impl ClaudeProvider {
             ));
         }
 
+        if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
+            let text = response.text().await.unwrap_or_default();
+            tracing::warn!("Rate limited by API: {}", text);
+            // Return cached snapshot if available
+            if let Some(cached) = self.last_snapshot.read().await.clone() {
+                tracing::info!("Returning cached snapshot after rate limit");
+                return Ok(cached);
+            }
+            return Err(ProviderError::RateLimit("Rate limited. Please try again later.".into()));
+        }
+
         if !status.is_success() {
             let text = response.text().await.unwrap_or_default();
             tracing::warn!("OAuth usage request failed: {} - {}", status, text);
@@ -353,11 +370,25 @@ impl Provider for ClaudeProvider {
     }
 
     async fn fetch(&self) -> Result<UsageSnapshot, ProviderError> {
+        // Rate limit: return cached data if called too frequently
+        {
+            let last_time = self.last_fetch_time.read().await;
+            if let Some(t) = *last_time {
+                if t.elapsed().as_secs() < MIN_FETCH_INTERVAL_SECS {
+                    if let Some(cached) = self.last_snapshot.read().await.clone() {
+                        tracing::debug!("Returning cached snapshot ({}s since last fetch)", t.elapsed().as_secs());
+                        return Ok(cached);
+                    }
+                }
+            }
+        }
+
         // Try OAuth token from Claude Code
         if let Some(token) = self.load_oauth_token().await {
             match self.fetch_via_oauth(&token).await {
                 Ok(snapshot) => {
                     *self.last_snapshot.write().await = Some(snapshot.clone());
+                    *self.last_fetch_time.write().await = Some(Instant::now());
                     return Ok(snapshot);
                 }
                 Err(ProviderError::AuthFailed(msg)) => {

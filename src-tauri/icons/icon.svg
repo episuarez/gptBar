@@ -1,63 +1,61 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#6C5CE7"/>
-      <stop offset="100%" style="stop-color:#0984E3"/>
+      <stop offset="0%" style="stop-color:#1A2332"/>
+      <stop offset="100%" style="stop-color:#0B1120"/>
     </linearGradient>
-    <linearGradient id="bar1" x1="0%" y1="100%" x2="0%" y2="0%">
-      <stop offset="0%" style="stop-color:#00B894"/>
-      <stop offset="100%" style="stop-color:#55EFC4"/>
+    <linearGradient id="bar" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" style="stop-color:#0891B2"/>
+      <stop offset="100%" style="stop-color:#22D3EE"/>
     </linearGradient>
-    <linearGradient id="bar2" x1="0%" y1="100%" x2="0%" y2="0%">
-      <stop offset="0%" style="stop-color:#FDCB6E"/>
-      <stop offset="100%" style="stop-color:#FFEAA7"/>
+    <linearGradient id="barHigh" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" style="stop-color:#D97706"/>
+      <stop offset="60%" style="stop-color:#F59E0B"/>
+      <stop offset="100%" style="stop-color:#FBBF24"/>
     </linearGradient>
-    <linearGradient id="bar3" x1="0%" y1="100%" x2="0%" y2="0%">
-      <stop offset="0%" style="stop-color:#E17055"/>
-      <stop offset="100%" style="stop-color:#FAB1A0"/>
-    </linearGradient>
-    <linearGradient id="spark" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#FFF"/>
-      <stop offset="100%" style="stop-color:#DFE6E9"/>
-    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
   </defs>
 
-  <!-- Rounded square background -->
-  <rect x="16" y="16" width="480" height="480" rx="96" ry="96" fill="url(#bg)"/>
+  <!-- Background -->
+  <rect width="512" height="512" rx="108" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="108" fill="none" stroke="rgba(34,211,238,0.06)" stroke-width="2"/>
 
-  <!-- Subtle inner shadow -->
-  <rect x="16" y="16" width="480" height="480" rx="96" ry="96" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="4"/>
+  <!-- Subtle grid lines -->
+  <line x1="72" y1="178" x2="440" y2="178" stroke="rgba(148,163,184,0.06)" stroke-width="1.5"/>
+  <line x1="72" y1="238" x2="440" y2="238" stroke="rgba(148,163,184,0.06)" stroke-width="1.5"/>
+  <line x1="72" y1="298" x2="440" y2="298" stroke="rgba(148,163,184,0.06)" stroke-width="1.5"/>
+  <line x1="72" y1="358" x2="440" y2="358" stroke="rgba(148,163,184,0.06)" stroke-width="1.5"/>
 
-  <!-- Three usage bars -->
-  <!-- Bar 1 (green) - 90% height -->
-  <rect x="100" y="148" width="72" height="248" rx="12" ry="12" fill="rgba(0,0,0,0.2)"/>
-  <rect x="100" y="172" width="72" height="224" rx="12" ry="12" fill="url(#bar1)"/>
+  <!-- Baseline -->
+  <line x1="72" y1="400" x2="440" y2="400" stroke="rgba(148,163,184,0.12)" stroke-width="2"/>
 
-  <!-- Bar 2 (yellow) - 65% height -->
-  <rect x="220" y="148" width="72" height="248" rx="12" ry="12" fill="rgba(0,0,0,0.2)"/>
-  <rect x="220" y="234" width="72" height="162" rx="12" ry="12" fill="url(#bar2)"/>
+  <!-- 4 bars — ascending: 30%, 55%, 75%, 92% of 280px max height -->
+  <!-- Bar area: y bottom=400, max top=120. bar width=64, gap=28, total=4*64+3*28=340, offset=(512-340)/2=86 -->
 
-  <!-- Bar 3 (orange/red) - 40% height -->
-  <rect x="340" y="148" width="72" height="248" rx="12" ry="12" fill="rgba(0,0,0,0.2)"/>
-  <rect x="340" y="297" width="72" height="99" rx="12" ry="12" fill="url(#bar3)"/>
+  <!-- Bar 1: 30% = 84px, top at 316 -->
+  <rect x="86" y="316" width="64" height="84" rx="12" fill="url(#bar)" opacity="0.85"/>
 
-  <!-- AI spark/brain symbol at top -->
-  <!-- Central dot -->
-  <circle cx="256" cy="88" r="14" fill="url(#spark)" opacity="0.95"/>
-  <!-- Radiating lines -->
-  <line x1="256" y1="62" x2="256" y2="50" stroke="white" stroke-width="5" stroke-linecap="round" opacity="0.8"/>
-  <line x1="276" y1="70" x2="284" y2="60" stroke="white" stroke-width="5" stroke-linecap="round" opacity="0.7"/>
-  <line x1="236" y1="70" x2="228" y2="60" stroke="white" stroke-width="5" stroke-linecap="round" opacity="0.7"/>
-  <line x1="282" y1="88" x2="292" y2="88" stroke="white" stroke-width="5" stroke-linecap="round" opacity="0.6"/>
-  <line x1="230" y1="88" x2="220" y2="88" stroke="white" stroke-width="5" stroke-linecap="round" opacity="0.6"/>
+  <!-- Bar 2: 55% = 154px, top at 246 -->
+  <rect x="178" y="246" width="64" height="154" rx="12" fill="url(#bar)" opacity="0.9"/>
 
-  <!-- Percentage labels under bars -->
-  <text x="136" y="432" fill="white" font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="700" text-anchor="middle" opacity="0.9">90</text>
-  <text x="256" y="432" fill="white" font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="700" text-anchor="middle" opacity="0.9">65</text>
-  <text x="376" y="432" fill="white" font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="700" text-anchor="middle" opacity="0.9">40</text>
+  <!-- Bar 3: 75% = 210px, top at 190 -->
+  <rect x="270" y="190" width="64" height="210" rx="12" fill="url(#bar)"/>
 
-  <!-- % symbols -->
-  <text x="160" y="432" fill="white" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="400" text-anchor="start" opacity="0.6">%</text>
-  <text x="280" y="432" fill="white" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="400" text-anchor="start" opacity="0.6">%</text>
-  <text x="400" y="432" fill="white" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="400" text-anchor="start" opacity="0.6">%</text>
+  <!-- Bar 4: 92% = 258px, top at 142 — amber, approaching limit -->
+  <rect x="362" y="142" width="64" height="258" rx="12" fill="url(#barHigh)" filter="url(#glow)"/>
+
+  <!-- Threshold line (dashed) at ~85% = 238px from bottom → y=162 -->
+  <line x1="72" y1="162" x2="440" y2="162" stroke="#EF4444" stroke-width="2" stroke-dasharray="8 6" opacity="0.5"/>
+
+  <!-- Small status dot — top-right area -->
+  <circle cx="416" cy="96" r="14" fill="#22D3EE" opacity="0.85"/>
+  <circle cx="416" cy="96" r="7" fill="#22D3EE">
+    <animate attributeName="opacity" values="0.4;1;0.4" dur="2.5s" repeatCount="indefinite"/>
+  </circle>
 </svg>

@@ -20,27 +20,44 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Generate changelog
+      - name: Generate changelog from git log
         id: changelog
-        uses: requarks/changelog-action@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ github.ref_name }}
-          writeToFile: false
-          includeInvalidCommits: true
+        shell: bash
+        run: |
+          TAG="${{ github.ref_name }}"
+          # Find the previous tag to diff against
+          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${TAG}$" | head -n1)
+          if [ -z "$PREV_TAG" ]; then
+            # No previous tag: list all commits
+            COMMITS=$(git log --pretty=format:"- %s" HEAD)
+          else
+            COMMITS=$(git log --pretty=format:"- %s" "${PREV_TAG}..HEAD")
+          fi
+          # Remove CI/bot/dependency commits from the user-visible changelog
+          FILTERED=$(echo "$COMMITS" | grep -v -E "^- (ci:|chore:|Bump |Merge pull request|dependabot)" || true)
+          if [ -z "$FILTERED" ]; then
+            FILTERED="- General improvements and bug fixes"
+          fi
+          # Write to file so multiline is preserved
+          echo "$FILTERED" > /tmp/changelog_body.txt
+          echo "prev_tag=${PREV_TAG}" >> "$GITHUB_OUTPUT"
 
       - name: Create release
         id: create-release
         uses: actions/github-script@v7
-        env:
-          CHANGELOG: ${{ steps.changelog.outputs.changes }}
         with:
           script: |
+            const fs = require('fs');
             const tag = context.ref.replace('refs/tags/', '');
-            const changelog = process.env.CHANGELOG || '';
-            const body = changelog
-              ? changelog + '\n\n---\nDownload the installer for your platform from the assets below.'
-              : 'Download the installer for your platform from the assets below.';
+            const commits = fs.readFileSync('/tmp/changelog_body.txt', 'utf8').trim();
+            const body = [
+              `## What's Changed`,
+              '',
+              commits,
+              '',
+              '---',
+              'Download the installer for your platform from the assets below.',
+            ].join('\n');
             const { data } = await github.rest.repos.createRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,

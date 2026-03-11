@@ -17,13 +17,13 @@
   let clampedPercent = $derived(Math.min(Math.max(percent, 0), 100));
 </script>
 
-<div class="usage-bar-container">
+<div class="usage-bar">
   <div class="usage-header">
     <span class="label">{label}</span>
-    <span class="percent {colorClass}">{percent.toFixed(1)}%</span>
+    <span class="percent {colorClass}">{Math.round(percent)}%</span>
   </div>
 
-  <div class="bar-background">
+  <div class="bar-track">
     <div
       class="bar-fill {colorClass}"
       style="width: {clampedPercent}%"
@@ -31,75 +31,70 @@
   </div>
 
   {#if resetTime}
-    <div class="reset-time">
-      Resets in: {resetTime}
-    </div>
+    <div class="reset-time">↺  Resets in {resetTime}</div>
   {/if}
 </div>
 
 <style>
-  .usage-bar-container {
-    margin-bottom: 0.5rem;
+  .usage-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
   }
 
   .usage-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.25rem;
   }
 
   .label {
-    color: #d1d5db;
-    font-size: 0.875rem;
+    color: #94A3B8;
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 12px;
   }
 
   .percent {
-    font-weight: 500;
-    font-size: 0.875rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 13px;
   }
 
-  .percent.normal {
-    color: #34d399;
-  }
+  .percent.normal { color: #22D3EE; }
+  .percent.warning { color: #F59E0B; }
+  .percent.critical { color: #EF4444; }
 
-  .percent.warning {
-    color: #fbbf24;
-  }
-
-  .percent.critical {
-    color: #f87171;
-  }
-
-  .bar-background {
+  .bar-track {
     width: 100%;
-    height: 0.5rem;
-    background-color: #374151;
-    border-radius: 9999px;
+    height: 6px;
+    background-color: #0F172A;
+    border-radius: 3px;
     overflow: hidden;
   }
 
   .bar-fill {
     height: 100%;
-    border-radius: 9999px;
-    transition: width 0.3s ease-out;
+    border-radius: 3px;
+    transition: width 0.4s ease-out;
   }
 
   .bar-fill.normal {
-    background: linear-gradient(90deg, #10b981, #34d399);
+    background: linear-gradient(90deg, #22D3EE, #0891B2);
   }
 
   .bar-fill.warning {
-    background: linear-gradient(90deg, #f59e0b, #fbbf24);
+    background: linear-gradient(90deg, #F59E0B, #D97706);
   }
 
   .bar-fill.critical {
-    background: linear-gradient(90deg, #ef4444, #f87171);
+    background: linear-gradient(90deg, #EF4444, #DC2626);
   }
 
   .reset-time {
-    color: #6b7280;
-    font-size: 0.75rem;
-    margin-top: 0.25rem;
+    color: #475569;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 400;
+    font-size: 10px;
   }
 </style>

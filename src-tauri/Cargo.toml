@@ -1,6 +1,6 @@
 [package]
 name = "gptbar"
-version = "0.1.0"
+version = "0.2.0"
 description = "A cross-platform system tray application to monitor your AI API usage"
 authors = ["episuarez"]
 edition = "2021"
@@ -24,6 +24,7 @@ tauri-plugin-opener = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-process = "2"
+tauri-plugin-updater = "2"
 
 # Serialization
 serde = { version = "1", features = ["derive"] }

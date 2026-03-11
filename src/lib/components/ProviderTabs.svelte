@@ -8,98 +8,173 @@
 
   let { providers, providerNames, activeProvider, onSelect }: Props = $props();
 
-  // Provider colors/icons
-  const providerStyles: Record<string, { bg: string; letter: string }> = {
-    claude: { bg: 'linear-gradient(135deg, #d97706, #f59e0b)', letter: 'C' },
-    openai: { bg: 'linear-gradient(135deg, #10a37f, #1a7f64)', letter: 'O' },
-    gemini: { bg: 'linear-gradient(135deg, #4285f4, #34a853)', letter: 'G' },
-    codex: { bg: 'linear-gradient(135deg, #6366f1, #8b5cf6)', letter: 'X' },
+  const providerColors: Record<string, string> = {
+    claude: '#D97706',
+    openai: '#10a37f',
+    gemini: '#4285f4',
+    codex: '#8B5CF6',
+    xai: '#94A3B8',
   };
 
-  function getStyle(providerId: string) {
-    return providerStyles[providerId] || { bg: '#6b7280', letter: '?' };
+  function getColor(providerId: string) {
+    return providerColors[providerId] || '#94A3B8';
+  }
+
+  // Detect if there are hidden tabs (scroll indicator)
+  let scrollContainer: HTMLElement;
+  let showScrollHint = $state(false);
+
+  function checkScroll() {
+    if (scrollContainer) {
+      showScrollHint = scrollContainer.scrollWidth > scrollContainer.clientWidth + 4;
+    }
+  }
+
+  // Check scroll on mount and when providers change
+  $effect(() => {
+    void providers.length;
+    requestAnimationFrame(checkScroll);
+  });
+
+  // Convert vertical wheel to horizontal scroll
+  function handleWheel(event: WheelEvent) {
+    if (scrollContainer && Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
+      event.preventDefault();
+      scrollContainer.scrollLeft += event.deltaY;
+      checkScroll();
+    }
   }
 </script>
 
-<div class="tabs-container">
-  {#each providers as providerId}
-    {@const style = getStyle(providerId)}
-    <button
-      class="tab"
-      class:active={activeProvider === providerId}
-      onclick={() => onSelect(providerId)}
-    >
-      <span class="tab-icon" style="background: {style.bg}">
-        {style.letter}
-      </span>
-      <span class="tab-name">{providerNames[providerId] || providerId}</span>
-    </button>
-  {/each}
+<div class="tab-bar">
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="tab-scroll"
+    bind:this={scrollContainer}
+    onscroll={checkScroll}
+    onwheel={handleWheel}
+  >
+    {#each providers as providerId}
+      {@const isActive = activeProvider === providerId}
+      <button
+        class="tab"
+        class:active={isActive}
+        onclick={() => onSelect(providerId)}
+      >
+        <span
+          class="tab-dot"
+          class:active-dot={isActive}
+          style="background: {isActive ? `linear-gradient(135deg, ${getColor(providerId)}, ${getColor(providerId)}cc)` : getColor(providerId)}"
+        ></span>
+        <span class="tab-label" class:active-label={isActive}>
+          {providerNames[providerId] || providerId}
+        </span>
+      </button>
+    {/each}
+  </div>
+
+  {#if showScrollHint}
+    <div class="fade-right"></div>
+    <div class="more-indicator">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22D3EE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="More tabs" role="img">
+        <polyline points="9 18 15 12 9 6"></polyline>
+      </svg>
+    </div>
+  {/if}
 </div>
 
+<svelte:window onresize={checkScroll} />
+
 <style>
-  .tabs-container {
+  .tab-bar {
     display: flex;
-    gap: 0.25rem;
-    padding: 0.5rem;
-    background-color: #151922;
-    border-bottom: 1px solid #2d3548;
+    align-items: center;
+    height: 52px;
+    background-color: #0A0F1C;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .tab-scroll {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    padding: 0 12px;
     overflow-x: auto;
+    flex: 1;
+    height: 100%;
+    scrollbar-width: none;
   }
 
-  .tabs-container::-webkit-scrollbar {
-    height: 4px;
-  }
-
-  .tabs-container::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  .tabs-container::-webkit-scrollbar-thumb {
-    background: #3d4558;
-    border-radius: 2px;
+  .tab-scroll::-webkit-scrollbar {
+    display: none;
   }
 
   .tab {
     display: flex;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.4rem 0.6rem;
-    background: transparent;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 12px;
     border: none;
-    border-radius: 0.375rem;
+    border-radius: 8px;
     cursor: pointer;
-    transition: background-color 0.15s;
     flex-shrink: 0;
+    min-width: 80px;
+    height: 38px;
+    background: transparent;
+    transition: background-color 0.15s;
   }
 
   .tab:hover {
-    background-color: #2d3548;
+    background-color: #1E293B80;
   }
 
   .tab.active {
-    background-color: #2d3548;
+    background-color: #1E293B;
   }
 
-  .tab-icon {
-    width: 1.25rem;
-    height: 1.25rem;
-    border-radius: 0.25rem;
+  .tab-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .tab-dot.active-dot {
+    width: 8px;
+    height: 8px;
+  }
+
+  .tab-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+    font-size: 11px;
+    color: #64748B;
+    white-space: nowrap;
+  }
+
+  .tab-label.active-label {
+    color: #FFFFFF;
+    font-weight: 600;
+  }
+
+  .fade-right {
+    position: absolute;
+    right: 28px;
+    top: 0;
+    width: 48px;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, #0A0F1C);
+    pointer-events: none;
+  }
+
+  .more-indicator {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
-    font-weight: bold;
-    font-size: 0.65rem;
-  }
-
-  .tab-name {
-    color: #9ca3af;
-    font-size: 0.75rem;
-    font-weight: 500;
-  }
-
-  .tab.active .tab-name {
-    color: white;
+    width: 28px;
+    height: 100%;
+    flex-shrink: 0;
   }
 </style>

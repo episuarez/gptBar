@@ -126,6 +126,15 @@ impl NotificationAgent {
     /// Checks each window (primary, secondary, tertiary) independently so the user
     /// knows exactly which limit is being approached.
     async fn check_and_notify(&self, provider_id: &str, snapshot: &UsageSnapshot) {
+        // Check if this provider is muted in config
+        let config = crate::config::AppConfig::load();
+        if config.muted_providers.contains(&provider_id.to_string()) {
+            return;
+        }
+
+        // Use cooldown from config if available (overrides agent default)
+        let effective_cooldown = config.notification_cooldown_minutes;
+
         let windows: Vec<(&str, Option<&crate::providers::RateWindow>)> = vec![
             ("primary", snapshot.primary.as_ref()),
             ("secondary", snapshot.secondary.as_ref()),
@@ -145,7 +154,7 @@ impl NotificationAgent {
                 if let Some(level) = level {
                     // Use a composite key for cooldown: provider + window
                     let cooldown_key = format!("{}:{}", provider_id, window_name);
-                    if self.should_notify(&cooldown_key).await {
+                    if self.should_notify_with_cooldown(&cooldown_key, effective_cooldown).await {
                         self.send_window_notification(
                             provider_id,
                             window_name,
@@ -159,12 +168,12 @@ impl NotificationAgent {
         }
     }
 
-    /// Checks if we should send a notification (respects cooldown)
-    async fn should_notify(&self, provider_id: &str) -> bool {
+    /// Checks if we should send a notification with an explicit cooldown in minutes
+    async fn should_notify_with_cooldown(&self, provider_id: &str, cooldown_minutes: u64) -> bool {
         let last_notifications = self.last_notifications.read().await;
 
         if let Some(last_time) = last_notifications.get(provider_id) {
-            let cooldown = chrono::Duration::minutes(self.thresholds.cooldown_minutes as i64);
+            let cooldown = chrono::Duration::minutes(cooldown_minutes as i64);
             let now = Utc::now();
 
             if now - *last_time < cooldown {

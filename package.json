@@ -1,6 +1,6 @@
 {
   "name": "gptbar",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A cross-platform system tray application to monitor your AI API usage",
   "type": "module",
   "scripts": {
@@ -26,6 +26,8 @@
     "openai",
     "gemini",
     "codex",
+    "xai",
+    "grok",
     "ai",
     "usage",
     "monitor",

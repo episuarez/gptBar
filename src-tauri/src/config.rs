@@ -37,6 +37,12 @@ pub struct AppConfig {
     /// Usage percentage that triggers a critical notification (default: 100%)
     #[serde(default = "default_critical_threshold")]
     pub critical_threshold: f64,
+    /// Cooldown between repeat notifications for same provider/window, in minutes (default: 30)
+    #[serde(default = "default_notification_cooldown")]
+    pub notification_cooldown_minutes: u64,
+    /// Whether each provider's notifications are muted
+    #[serde(default)]
+    pub muted_providers: Vec<String>,
 }
 
 fn default_enabled_providers() -> Vec<String> {
@@ -49,6 +55,10 @@ fn default_warning_threshold() -> f64 {
 
 fn default_critical_threshold() -> f64 {
     100.0
+}
+
+fn default_notification_cooldown() -> u64 {
+    30
 }
 
 impl Default for AppConfig {
@@ -69,11 +79,18 @@ impl Default for AppConfig {
             provider_settings,
             warning_threshold: default_warning_threshold(),
             critical_threshold: default_critical_threshold(),
+            notification_cooldown_minutes: default_notification_cooldown(),
+            muted_providers: Vec::new(),
         }
     }
 }
 
 impl AppConfig {
+    /// Gets the config directory path (cross-platform) - public for use by other modules
+    pub fn config_dir_pub() -> Option<PathBuf> {
+        Self::config_dir()
+    }
+
     /// Gets the config directory path (cross-platform)
     fn config_dir() -> Option<PathBuf> {
         #[cfg(target_os = "windows")]
@@ -151,8 +168,8 @@ impl AppConfig {
     pub fn validate_refresh_interval(&self) -> Option<String> {
         if self.refresh_interval < 10 {
             Some(format!(
-                "Un intervalo de {} minutos podría provocar errores por demasiadas peticiones. \
-                 Se recomienda un mínimo de 10 minutos para evitar límites de tasa de las APIs.",
+                "A refresh interval of {} minutes may cause rate limiting errors. \
+                 A minimum of 10 minutes is recommended to avoid hitting API rate limits.",
                 self.refresh_interval
             ))
         } else {
@@ -415,7 +432,7 @@ mod tests {
         config.refresh_interval = 3;
         let warning = config.validate_refresh_interval();
         assert!(warning.is_some());
-        assert!(warning.unwrap().contains("demasiadas peticiones"));
+        assert!(warning.unwrap().contains("rate limiting"));
     }
 
     #[test]

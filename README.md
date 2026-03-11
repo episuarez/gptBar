@@ -1,210 +1,78 @@
 <p align="center">
-  <img src="src-tauri/icons/icon.png" width="128" height="128" alt="GPTBar Icon">
+  <img src="src-tauri/icons/icon.png" width="128" height="128" alt="GPTBar">
 </p>
 
 <h1 align="center">GPTBar</h1>
 
 <p align="center">
-  A cross-platform system tray application to monitor your AI API usage.<br>
-  Inspired by <a href="https://github.com/steipete/CodexBar">CodexBar</a>.
+  System tray app to monitor AI provider usage in real time.<br>
+  Built with <a href="https://tauri.app">Tauri 2</a> + <a href="https://svelte.dev">Svelte 5</a>. Inspired by <a href="https://github.com/steipete/CodexBar">CodexBar</a>.
 </p>
 
-![Screenshot](docs/screenshot.png)
+<p align="center">
+  <img src="docs/screenshot-main.png" width="260" alt="Usage dashboard">
+  &nbsp;&nbsp;
+  <img src="docs/screenshot-tabs.png" width="260" alt="Multi-provider tabs">
+  &nbsp;&nbsp;
+  <img src="docs/screenshot-settings.png" width="260" alt="Settings">
+</p>
+
+## Providers
+
+| Provider | Auth | What it tracks |
+|----------|------|----------------|
+| **Claude** (Anthropic) | OAuth | Session, weekly & model limits |
+| **OpenAI** | API Key | Billing usage & limits |
+| **Gemini** (Google) | API Key | Quota usage |
+| **Codex** | API Key | Token usage |
+| **xAI** (Grok) | API Key | Token & balance usage |
 
 ## Features
 
-- **Multi-Provider Monitoring** - Track usage for Claude, OpenAI, Gemini, and Codex
-- **Cross-Platform** - Works on Windows, macOS, and Linux
-- **System Tray Integration** - Visual usage indicators in the taskbar/menu bar
-- **Session & Weekly Limits** - Monitor 5-hour session and weekly usage caps
-- **Notifications** - Get alerts when approaching usage limits (configurable, default 90%/100%)
-- **Per-Window Alerts** - Independent notifications for each rate window (session, weekly, model-specific)
-- **Secure Storage** - Credentials stored using OS keyring (Windows Credential Manager, macOS Keychain, Linux Secret Service)
-- **Background Refresh** - Automatic updates every 10 minutes (configurable, warns if < 10 min)
-- **Lightweight** - Built with Tauri for minimal resource footprint
+- **Tray icon** changes color with usage level — cyan (ok), amber (warning), red (critical)
+- **Multi-provider tabs** — switch between providers in one window
+- **Desktop notifications** with configurable thresholds and per-window cooldowns
+- **Usage history** with sparkline charts, exportable to JSON/CSV
+- **Secure storage** — credentials in OS keyring (Windows Credential Manager / macOS Keychain / Linux Secret Service)
+- **Auto-refresh** every 10 minutes (configurable), with client-side rate limiting
 
-## Supported Providers
+## Quick Start
 
-| Provider | Status | Authentication |
-|----------|--------|----------------|
-| Claude (Anthropic) | Full support | Browser session token |
-| OpenAI | Full support | API Key |
-| Gemini (Google) | Full support | API Key |
-| Codex | Basic support | API Key |
-
-## Installation
-
-### Prerequisites
-
-1. **Rust** - Install from [rustup.rs](https://rustup.rs)
-2. **Node.js** - Version 18 or higher
-3. **Platform-specific**:
-   - **Windows**: Visual Studio Build Tools
-   - **macOS**: Xcode Command Line Tools (`xcode-select --install`)
-   - **Linux**: `build-essential`, `libwebkit2gtk-4.1-dev`, `libssl-dev`, `libayatana-appindicator3-dev`
-
-### Build from Source
+**Prerequisites:** [Rust](https://rustup.rs), Node.js 18+, and platform build tools (VS Build Tools on Windows, Xcode CLI on macOS, `build-essential` + `libwebkit2gtk-4.1-dev` + `libssl-dev` + `libayatana-appindicator3-dev` on Linux).
 
 ```bash
-# Clone the repository
 git clone https://github.com/episuarez/gptBar.git
 cd gptBar
-
-# Install dependencies
 npm install
-
-# Development mode
-npm run tauri dev
-
-# Build for production
-npm run tauri build
+npm run tauri dev      # development
+npm run tauri build    # production → src-tauri/target/release/bundle/
 ```
-
-The installer will be in `src-tauri/target/release/bundle/`.
-
-## Usage
-
-1. **Launch** - GPTBar starts minimized in your system tray
-2. **Click tray icon** - Opens the usage dashboard
-3. **Configure providers** - Click settings to enable/disable providers
-4. **Login** - Click "Login" for each provider to add credentials
-5. **View Usage** - Usage bars show current consumption
-6. **Refresh** - Click the refresh button or wait for auto-refresh
-
-### Keyboard Shortcuts
-
-- `Escape` - Close the window
-- Click outside - Auto-hide
-
-## Architecture
-
-```
-gptBar/
-├── src-tauri/                # Rust backend
-│   ├── src/
-│   │   ├── providers/        # AI provider integrations
-│   │   │   ├── base.rs       # Provider trait & types
-│   │   │   ├── claude.rs     # Claude implementation
-│   │   │   ├── openai.rs     # OpenAI implementation
-│   │   │   ├── gemini.rs     # Gemini implementation
-│   │   │   └── codex.rs      # Codex implementation
-│   │   ├── auth/             # Authentication
-│   │   │   ├── secure_store.rs
-│   │   │   └── cookie_extractor.rs
-│   │   ├── agents/           # Background tasks
-│   │   │   ├── refresh_agent.rs
-│   │   │   └── notification_agent.rs
-│   │   └── security/         # Security utilities
-│   │       ├── sanitizer.rs
-│   │       └── secure_string.rs
-│   └── Cargo.toml
-├── src/                      # Svelte frontend
-│   ├── lib/
-│   │   ├── components/
-│   │   │   ├── ProviderCard.svelte
-│   │   │   ├── ProviderTabs.svelte
-│   │   │   └── UsageBar.svelte
-│   │   └── types.ts
-│   └── routes/
-│       └── +page.svelte
-└── package.json
-```
-
-## Tech Stack
-
-- **Backend**: Rust + Tauri 2.0
-- **Frontend**: Svelte 5 + TypeScript
-- **Secure Storage**: OS Keyring (keyring-rs)
-  - Windows: Credential Manager
-  - macOS: Keychain
-  - Linux: Secret Service (GNOME Keyring, KWallet)
-- **HTTP**: reqwest with rustls
-
-## Security
-
-- API keys stored in OS secure keyring
-- No plaintext secrets in logs (sanitization)
-- SecureString with zeroization for sensitive data
-- HTTPS only with certificate validation
-
-## Development
-
-### Running Tests
-
-```bash
-# Rust tests
-cd src-tauri
-cargo test
-
-# With coverage
-cargo tarpaulin --out Html
-```
-
-### Commands
-
-```bash
-npm run dev           # Start Vite dev server
-npm run tauri dev     # Start full Tauri dev environment
-npm run build         # Build frontend
-npm run tauri build   # Build complete application
-npm run check         # Run Svelte type checker
-npm run lint          # Run linter
-```
-
-### Project Principles
-
-- **TDD**: Tests written before implementation
-- **SOLID**: Single responsibility, Open/closed, Liskov substitution, Interface segregation, Dependency inversion
-- **Security First**: All sensitive data handled securely
 
 ## Configuration
 
-Settings are stored in your OS config directory:
-- **Windows**: `%APPDATA%/gptbar/config.json`
-- **macOS**: `~/Library/Application Support/gptbar/config.json`
-- **Linux**: `~/.config/gptbar/config.json`
+Settings are stored in your OS config directory as `config.json`:
 
-## Authentication Methods
-
-1. **OAuth** (Preferred) - Via api.anthropic.com
-2. **Browser Cookies** - Extracted from Chrome/Edge/Firefox
-3. **API Keys** - Direct API key input
-
-## Recommended IDE Setup
-
-[VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+| OS | Path |
+|----|------|
+| Windows | `%APPDATA%/gptbar/` |
+| macOS | `~/Library/Application Support/gptbar/` |
+| Linux | `~/.config/gptbar/` |
 
 ## Releases
 
-Releases are automatically generated when a tag is pushed:
+Push a tag to trigger CI builds for Windows, macOS (Intel + Apple Silicon), and Linux:
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.2.0
+git push origin v0.2.0
 ```
 
-This triggers GitHub Actions to:
-1. Generate a changelog from commits since the last tag
-2. Build binaries for Windows, macOS (Intel + Apple Silicon), and Linux
-3. Create a GitHub Release with the changelog and installers
-
-Tags with `-` (e.g., `v0.1.0-beta`) are marked as pre-release.
+Tags with `-` (e.g. `v0.2.0-beta`) are marked as pre-release.
 
 ## License
 
-GPL-3.0 - See [LICENSE](LICENSE) for details.
+[GPL-3.0](LICENSE)
 
 ## Credits
 
-- Inspired by [CodexBar](https://github.com/steipete/CodexBar) by steipete
-- Built with [Tauri](https://tauri.app) and [Svelte](https://svelte.dev)
+Inspired by [CodexBar](https://github.com/steipete/CodexBar) by steipete.

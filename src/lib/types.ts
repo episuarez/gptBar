@@ -51,4 +51,14 @@ export interface AppConfig {
   provider_settings: Record<string, ProviderSettings>;
   warning_threshold: number;
   critical_threshold: number;
+  notification_cooldown_minutes: number;
+  muted_providers: string[];
+}
+
+export interface HistoryEntry {
+  provider_id: string;
+  timestamp: string;
+  primary_percent: number | null;
+  secondary_percent: number | null;
+  tertiary_percent: number | null;
 }

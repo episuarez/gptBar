@@ -6,7 +6,55 @@ on:
       - 'v*'
 
 jobs:
-  build-and-release:
+  create-release:
+    permissions:
+      contents: write
+    runs-on: ubuntu-22.04
+    outputs:
+      release_id: ${{ steps.create-release.outputs.id }}
+      release_upload_url: ${{ steps.create-release.outputs.upload_url }}
+      release_body: ${{ steps.changelog.outputs.changes }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        uses: requarks/changelog-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.ref_name }}
+          writeToFile: false
+          includeInvalidCommits: true
+
+      - name: Create release
+        id: create-release
+        uses: actions/github-script@v7
+        env:
+          CHANGELOG: ${{ steps.changelog.outputs.changes }}
+        with:
+          script: |
+            const tag = context.ref.replace('refs/tags/', '');
+            const changelog = process.env.CHANGELOG || '';
+            const body = changelog
+              ? changelog + '\n\n---\nDownload the installer for your platform from the assets below.'
+              : 'Download the installer for your platform from the assets below.';
+            const { data } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              name: `GPTBar ${tag}`,
+              body,
+              draft: false,
+              prerelease: tag.includes('-'),
+            });
+            core.setOutput('id', data.id);
+            core.setOutput('upload_url', data.upload_url);
+
+  build:
+    needs: create-release
     permissions:
       contents: write
     strategy:
@@ -55,27 +103,24 @@ jobs:
       - name: Install frontend dependencies
         run: npm install
 
-      - name: Generate changelog
-        id: changelog
-        uses: requarks/changelog-action@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ github.ref_name }}
-          writeToFile: false
-          includeInvalidCommits: true
+      - name: Update version from tag
+        shell: bash
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"
+          # Update tauri.conf.json version
+          node -e "
+            const fs = require('fs');
+            const conf = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
+            conf.version = '$VERSION';
+            fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(conf, null, 2));
+            console.log('Updated version to', '$VERSION');
+          "
 
-      - name: Build and release
+      - name: Build and upload release assets
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'GPTBar ${{ github.ref_name }}'
-          releaseBody: |
-            ${{ steps.changelog.outputs.changes }}
-
-            ---
-            Download the installer for your platform from the assets below.
-          releaseDraft: false
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}

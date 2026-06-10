@@ -48,6 +48,7 @@ vite.config.ts.timestamp-*
 /src-tauri/target/
 /src-tauri/WixTools/
 /src-tauri/icons/*.ico.bak
+/src-tauri/gen/schemas/
 
 # Local development
 *.local
@@ -58,3 +59,13 @@ vite.config.ts.timestamp-*
 *.key
 credentials.json
 .credentials.json
+
+# Claude Code tooling
+.context-mode/
+.code-review-graph/
+CLAUDE.md.bak
+.serena/
+.swarm/
+.claude-flow/
+.claude/init-snapshot.json
+settings.json.bak

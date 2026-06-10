@@ -1,78 +1,67 @@
-<p align="center">
-  <img src="src-tauri/icons/icon.png" width="128" height="128" alt="GPTBar">
-</p>
-
-<h1 align="center">GPTBar</h1>
-
-<p align="center">
-  System tray app to monitor AI provider usage in real time.<br>
-  Built with <a href="https://tauri.app">Tauri 2</a> + <a href="https://svelte.dev">Svelte 5</a>. Inspired by <a href="https://github.com/steipete/CodexBar">CodexBar</a>.
-</p>
-
-<p align="center">
-  <img src="docs/screenshot-main.png" width="260" alt="Usage dashboard">
+<div align="center">
+  <img src=".github/screenshots/dashboard.png" width="260" alt="Usage dashboard">
   &nbsp;&nbsp;
-  <img src="docs/screenshot-tabs.png" width="260" alt="Multi-provider tabs">
+  <img src=".github/screenshots/tabs.png" width="260" alt="Multi-provider tabs">
   &nbsp;&nbsp;
-  <img src="docs/screenshot-settings.png" width="260" alt="Settings">
-</p>
+  <img src=".github/screenshots/settings.png" width="260" alt="Settings">
 
-## Providers
+  <h1>GPTBar</h1>
+
+  **Monitor AI provider usage from your system tray — Claude, OpenAI, Gemini, Codex and xAI in one place.**
+
+  [![CI](https://img.shields.io/github/actions/workflow/status/episuarez/gptBar/ci.yml?style=flat-square&label=CI)](https://github.com/episuarez/gptBar/actions)
+  [![Release](https://img.shields.io/github/v/release/episuarez/gptBar?style=flat-square&label=release)](https://github.com/episuarez/gptBar/releases)
+  [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+  [![Platform](https://img.shields.io/badge/platform-Windows-0078d4?style=flat-square&logo=windows&logoColor=white)](https://github.com/episuarez/gptBar/releases)
+  [![Rust](https://img.shields.io/badge/rust-stable-orange?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org)
+  [![Tauri](https://img.shields.io/badge/tauri-2-24c8db?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app)
+</div>
+
+## Install
+
+Download the latest `.exe` (NSIS) or `.msi` installer from the [Releases](https://github.com/episuarez/gptBar/releases) page.
+
+Requires Windows 10 version 1803 or later.
+
+## What it does
+
+| Feature | Description |
+|---------|-------------|
+| **5 providers** | Claude (OAuth), OpenAI, Gemini, Codex and xAI — toggle each on/off |
+| **Tray icon** | Color-coded: cyan (ok) → amber (warning) → red (critical) |
+| **API key management** | Enter keys directly in Settings — stored in Windows Credential Manager |
+| **Usage history** | Sparkline charts with JSON/CSV export |
+| **Desktop notifications** | Configurable thresholds and per-provider cooldowns |
+| **Auto-refresh** | Every 10 minutes (configurable), client-side rate limiting |
+
+### Provider details
 
 | Provider | Auth | What it tracks |
 |----------|------|----------------|
-| **Claude** (Anthropic) | OAuth | Session, weekly & model limits |
-| **OpenAI** | API Key | Billing usage & limits |
-| **Gemini** (Google) | API Key | Quota usage |
-| **Codex** | API Key | Token usage |
-| **xAI** (Grok) | API Key | Token & balance usage |
+| **Claude** (Anthropic) | OAuth via Claude Code CLI | Session, weekly and model limits |
+| **OpenAI** | API key | Billing usage and limits |
+| **Gemini** (Google) | API key | Quota usage |
+| **Codex** | API key | Token usage (uses OpenAI endpoints) |
+| **xAI** (Grok) | API key | Token and balance usage |
 
-## Features
+## Build from source
 
-- **Tray icon** changes color with usage level — cyan (ok), amber (warning), red (critical)
-- **Multi-provider tabs** — switch between providers in one window
-- **Desktop notifications** with configurable thresholds and per-window cooldowns
-- **Usage history** with sparkline charts, exportable to JSON/CSV
-- **Secure storage** — credentials in OS keyring (Windows Credential Manager / macOS Keychain / Linux Secret Service)
-- **Auto-refresh** every 10 minutes (configurable), with client-side rate limiting
+**Prerequisites:** [Rust stable](https://rustup.rs), Node.js 18+, [VS Build Tools](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022) with the C++ workload and WebView2 runtime (ships with Windows 10 1803+).
 
-## Quick Start
-
-**Prerequisites:** [Rust](https://rustup.rs), Node.js 18+, and platform build tools (VS Build Tools on Windows, Xcode CLI on macOS, `build-essential` + `libwebkit2gtk-4.1-dev` + `libssl-dev` + `libayatana-appindicator3-dev` on Linux).
-
-```bash
+```bat
 git clone https://github.com/episuarez/gptBar.git
 cd gptBar
 npm install
-npm run tauri dev      # development
-npm run tauri build    # production → src-tauri/target/release/bundle/
+scripts\dev.bat      # hot-reload dev mode
+scripts\build.bat    # production build → src-tauri/target/release/bundle/
 ```
 
-## Configuration
+## Contributing
 
-Settings are stored in your OS config directory as `config.json`:
-
-| OS | Path |
-|----|------|
-| Windows | `%APPDATA%/gptbar/` |
-| macOS | `~/Library/Application Support/gptbar/` |
-| Linux | `~/.config/gptbar/` |
-
-## Releases
-
-Push a tag to trigger CI builds for Windows, macOS (Intel + Apple Silicon), and Linux:
-
-```bash
-git tag v0.2.0
-git push origin v0.2.0
-```
-
-Tags with `-` (e.g. `v0.2.0-beta`) are marked as pre-release.
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-[GPL-3.0](LICENSE)
-
-## Credits
+[MIT](LICENSE) — Copyright (c) 2026 episuarez
 
 Inspired by [CodexBar](https://github.com/steipete/CodexBar) by steipete.

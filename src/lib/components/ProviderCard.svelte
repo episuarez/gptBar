@@ -64,22 +64,22 @@
     openai: {
       dashboard: 'https://platform.openai.com/usage',
       status: 'https://status.openai.com',
-      loginSteps: ['Set OPENAI_API_KEY env var', 'Restart GPTBar', 'Click Refresh Now below'],
+      loginSteps: ['Open Settings → API Keys', 'Paste your OpenAI API key', 'Click Refresh Now below'],
     },
     gemini: {
       dashboard: 'https://aistudio.google.com',
       status: 'https://status.cloud.google.com',
-      loginSteps: ['Set GOOGLE_API_KEY env var', 'Restart GPTBar', 'Click Refresh Now below'],
+      loginSteps: ['Open Settings → API Keys', 'Paste your Google API key', 'Click Refresh Now below'],
     },
     codex: {
       dashboard: 'https://platform.openai.com/usage',
       status: 'https://status.openai.com',
-      loginSteps: ['Set CODEX_API_KEY env var', 'Or use OPENAI_API_KEY', 'Click Refresh Now below'],
+      loginSteps: ['Open Settings → API Keys', 'Paste your OpenAI/Codex API key', 'Click Refresh Now below'],
     },
     xai: {
       dashboard: 'https://console.x.ai/',
       status: 'https://status.x.ai',
-      loginSteps: ['Set XAI_API_KEY env var', 'Restart GPTBar', 'Click Refresh Now below'],
+      loginSteps: ['Open Settings → API Keys', 'Paste your xAI API key', 'Click Refresh Now below'],
     },
   };
 
@@ -139,18 +139,9 @@
 
   // Dynamic version
   let appVersion = $state('...');
-  let updateAvailable = $state<string | null>(null);
-  let updatingApp = $state(false);
-
   $effect(() => {
     getVersion().then((v: string) => { appVersion = v; }).catch(() => { appVersion = '0.2.0'; });
-    invoke<string | null>('check_for_updates').then((v: string | null) => { updateAvailable = v; }).catch(() => {});
   });
-
-  async function handleInstallUpdate() {
-    updatingApp = true;
-    try { await invoke('install_update'); } catch { updatingApp = false; }
-  }
 
   // Settings state
   let refreshInterval = $state(10);
@@ -161,6 +152,7 @@
   let mutedProviders = $state<string[]>([]);
   let warningThreshold = $state(85);
   let criticalThreshold = $state(95);
+  let apiKeys = $state<Record<string, string>>({});
 
   // History / sparkline
   let historyPoints = $state<number[]>([]);
@@ -181,6 +173,11 @@
         mutedProviders = [...(config.muted_providers ?? [])];
         warningThreshold = config.warning_threshold ?? 85;
         criticalThreshold = config.critical_threshold ?? 95;
+        apiKeys = Object.fromEntries(
+          allProviders
+            .filter(p => p.id !== 'claude')
+            .map(p => [p.id, config.provider_settings?.[p.id]?.api_key ?? ''])
+        );
       } catch {
         localEnabledProviders = [...enabledProviders];
       }
@@ -224,6 +221,14 @@
     const idx = presets.indexOf(notificationCooldown);
     const newIdx = Math.min(presets.length - 1, Math.max(0, idx + delta));
     await setCooldown(presets[newIdx]);
+  }
+
+  async function handleApiKeyChange(providerId: string, value: string) {
+    apiKeys[providerId] = value;
+    try {
+      await invoke('set_provider_api_key', { providerId, apiKey: value });
+      if (value) await invoke('trigger_refresh');
+    } catch {}
   }
 
   async function handleProviderToggle(provId: string) {
@@ -516,6 +521,30 @@
 
           <div class="section-divider"></div>
 
+          <!-- API KEYS -->
+          <div class="settings-section-label">API KEYS</div>
+          <div class="settings-list">
+            {#each allProviders.filter(p => p.id !== 'claude') as provider}
+              <div class="settings-row-vertical">
+                <div class="settings-row">
+                  <div class="settings-row-left">
+                    <span class="provider-dot" style="background: {provider.color}"></span>
+                    <span class="settings-row-text">{provider.name}</span>
+                  </div>
+                </div>
+                <input
+                  type="password"
+                  class="api-key-input"
+                  placeholder="Enter API key…"
+                  value={apiKeys[provider.id] ?? ''}
+                  onblur={(e) => handleApiKeyChange(provider.id, (e.target as HTMLInputElement).value)}
+                />
+              </div>
+            {/each}
+          </div>
+
+          <div class="section-divider"></div>
+
           <!-- GENERAL -->
           <div class="settings-section-label">GENERAL</div>
           <div class="settings-list">
@@ -654,32 +683,17 @@
             <p class="about-desc">Real-time AI usage monitor for your system tray</p>
           </div>
 
-          {#if updateAvailable}
-            <div class="update-banner">
-              <div class="update-left">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22D3EE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
-                <div class="update-text">
-                  <span class="update-title">Update available!</span>
-                  <span class="update-ver">v{updateAvailable} is ready</span>
-                </div>
-              </div>
-              <button class="btn-install" onclick={handleInstallUpdate} disabled={updatingApp}>
-                {updatingApp ? '...' : 'Install'}
-              </button>
-            </div>
-          {/if}
-
           <div class="about-stats">
             <div class="stat-card">
               <span class="stat-val">5</span>
               <span class="stat-label">Providers</span>
             </div>
             <div class="stat-card">
-              <span class="stat-val">3</span>
-              <span class="stat-label">Platforms</span>
+              <span class="stat-val">Win</span>
+              <span class="stat-label">Platform</span>
             </div>
             <div class="stat-card">
-              <span class="stat-val">GPL</span>
+              <span class="stat-val">MIT</span>
               <span class="stat-label">License</span>
             </div>
           </div>
@@ -1421,6 +1435,29 @@
     border-color: rgba(34, 211, 238, 0.53);
     color: #22D3EE;
     font-weight: 700;
+  }
+
+  /* API key inputs */
+  .api-key-input {
+    width: 100%;
+    box-sizing: border-box;
+    background: #0F172A;
+    border: 1px solid #1E293B;
+    border-radius: 6px;
+    color: #E2E8F0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 6px 10px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .api-key-input:focus {
+    border-color: #22D3EE;
+  }
+
+  .api-key-input::placeholder {
+    color: #475569;
   }
 
   /* Notification cards */

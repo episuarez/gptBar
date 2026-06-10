@@ -116,7 +116,6 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             // Create app state
             let state = tokio::runtime::Runtime::new()
@@ -250,8 +249,6 @@ pub fn run() {
             commands::export_history_json,
             commands::export_history_csv,
             commands::clear_provider_history,
-            commands::check_for_updates,
-            commands::install_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

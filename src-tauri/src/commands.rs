@@ -535,26 +535,3 @@ pub fn set_provider_api_key(provider_id: String, api_key: String) -> Result<(), 
     Ok(())
 }
 
-// Updater Commands
-
-#[tauri::command]
-pub async fn check_for_updates(app: tauri::AppHandle) -> Result<Option<String>, String> {
-    use tauri_plugin_updater::UpdaterExt;
-    match app.updater() {
-        Ok(updater) => match updater.check().await {
-            Ok(Some(update)) => Ok(Some(update.version.clone())),
-            Ok(None) => Ok(None),
-            Err(e) => { tracing::warn!("Update check failed: {}", e); Ok(None) }
-        },
-        Err(e) => { tracing::warn!("Updater not available: {}", e); Ok(None) }
-    }
-}
-
-#[tauri::command]
-pub async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
-    use tauri_plugin_updater::UpdaterExt;
-    let updater = app.updater().map_err(|e| e.to_string())?;
-    let update = updater.check().await.map_err(|e| e.to_string())?.ok_or("No update available")?;
-    update.download_and_install(|_chunk, _total| {}, || {}).await.map_err(|e| e.to_string())?;
-    app.restart();
-}

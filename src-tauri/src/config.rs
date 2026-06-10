@@ -66,11 +66,14 @@ impl Default for AppConfig {
         let mut provider_settings = HashMap::new();
         provider_settings.insert(
             "claude".to_string(),
-            ProviderSettings {
-                enabled: true,
-                api_key: None,
-            },
+            ProviderSettings { enabled: true, api_key: None },
         );
+        for id in &["openai", "gemini", "codex", "xai"] {
+            provider_settings.insert(
+                id.to_string(),
+                ProviderSettings { enabled: false, api_key: None },
+            );
+        }
 
         Self {
             refresh_interval: 10,

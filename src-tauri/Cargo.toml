@@ -1,10 +1,10 @@
 [package]
 name = "gptbar"
-version = "0.2.0"
+version = "0.2.1"
 description = "A cross-platform system tray application to monitor your AI API usage"
 authors = ["episuarez"]
 edition = "2021"
-license = "GPL-3.0"
+license = "MIT"
 repository = "https://github.com/episuarez/gptBar"
 homepage = "https://github.com/episuarez/gptBar"
 readme = "../README.md"
@@ -24,8 +24,6 @@ tauri-plugin-opener = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-process = "2"
-tauri-plugin-updater = "2"
-
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -39,7 +37,7 @@ reqwest = { version = "0.12", features = ["json", "cookies", "rustls-tls"], defa
 # Secure storage
 keyring = "3"
 
-# Database (for cookies)
+# Database (history storage)
 rusqlite = { version = "0.32", features = ["bundled"] }
 
 # Date/Time
@@ -61,12 +59,6 @@ zeroize = { version = "1", features = ["derive"] }
 
 # Base64 encoding
 base64 = "0.22"
-
-# AES-GCM encryption (for Chrome v10/v11 cookies)
-aes-gcm = "0.10"
-
-# Open URLs in browser
-opener = "0.7"
 
 # Cancellation tokens for agents
 tokio-util = { version = "0.7", features = ["rt"] }

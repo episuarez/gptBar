@@ -4,17 +4,16 @@
   <img src=".github/screenshots/tabs.png" width="260" alt="Multi-provider tabs">
   &nbsp;&nbsp;
   <img src=".github/screenshots/settings.png" width="260" alt="Settings">
-
   <h1>GPTBar</h1>
-
-  **Monitor AI provider usage from your system tray — Claude, OpenAI, Gemini, Codex and xAI in one place.**
-
-  [![CI](https://img.shields.io/github/actions/workflow/status/episuarez/gptBar/ci.yml?style=flat-square&label=CI)](https://github.com/episuarez/gptBar/actions)
-  [![Release](https://img.shields.io/github/v/release/episuarez/gptBar?style=flat-square&label=release)](https://github.com/episuarez/gptBar/releases)
-  [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
-  [![Platform](https://img.shields.io/badge/platform-Windows-0078d4?style=flat-square&logo=windows&logoColor=white)](https://github.com/episuarez/gptBar/releases)
-  [![Rust](https://img.shields.io/badge/rust-stable-orange?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org)
-  [![Tauri](https://img.shields.io/badge/tauri-2-24c8db?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app)
+  <p>Monitor AI provider usage from your system tray — Claude, OpenAI, Gemini, Codex and xAI in one place.</p>
+  <p>
+    <a href="https://github.com/episuarez/gptBar/actions"><img src="https://img.shields.io/github/actions/workflow/status/episuarez/gptBar/ci.yml?style=flat-square&label=CI" alt="CI"></a>
+    <a href="https://github.com/episuarez/gptBar/releases"><img src="https://img.shields.io/github/v/release/episuarez/gptBar?style=flat-square&label=release" alt="Release"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License"></a>
+    <a href="https://github.com/episuarez/gptBar/releases"><img src="https://img.shields.io/badge/platform-Windows-0078d4?style=flat-square&logo=windows&logoColor=white" alt="Platform"></a>
+    <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/rust-stable-orange?style=flat-square&logo=rust&logoColor=white" alt="Rust"></a>
+    <a href="https://tauri.app"><img src="https://img.shields.io/badge/tauri-2-24c8db?style=flat-square&logo=tauri&logoColor=white" alt="Tauri"></a>
+  </p>
 </div>
 
 ## Install

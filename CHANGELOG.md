@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.1] — 2026-06-10
+## [0.2.1] — 2026-06-11
 
 ### Added
 - xAI (Grok) provider with token and balance tracking
@@ -15,12 +15,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Per-provider notification cooldowns and mute controls
 - API key management in Settings — stored in Windows Credential Manager
 - All 5 providers pre-registered in default config (disabled by default except Claude)
+- CI workflow: fmt + clippy + tests + svelte-check on every push/PR
+- NSIS and MSI Windows installers via release workflow
+- CONTRIBUTING.md, CHANGELOG.md, issue templates and PR template
+- `scripts/dev.bat` and `scripts/build.bat` helpers
 
 ### Changed
-- Removed auto-updater plugin — users download new releases from GitHub
-- Windows-only builds (NSIS + MSI installers)
+- Windows-only builds — removed macOS and Linux from release matrix
 - License changed from GPL-3.0 to MIT
-- Removed dead cookie-extraction code and its dependencies (rusqlite, aes-gcm)
+- Login instructions for non-Claude providers now point to Settings → API Keys
+
+### Removed
+- Auto-updater plugin — users download new releases from GitHub Releases
+- Dead cookie-extraction module and its dependencies (`aes-gcm`)
 
 ## [0.1.0] — 2025-12-01
 

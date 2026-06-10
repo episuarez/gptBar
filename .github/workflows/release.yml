@@ -3,141 +3,69 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
 
 jobs:
-  create-release:
-    permissions:
-      contents: write
-    runs-on: ubuntu-22.04
-    outputs:
-      release_id: ${{ steps.create-release.outputs.id }}
-      release_upload_url: ${{ steps.create-release.outputs.upload_url }}
-      release_body: ${{ steps.changelog.outputs.changes }}
-
+  verify:
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
-      - name: Generate changelog from git log
-        id: changelog
-        shell: bash
+      - name: Check tag matches tauri.conf.json version
+        shell: pwsh
         run: |
-          TAG="${{ github.ref_name }}"
-          # Find the previous tag to diff against
-          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${TAG}$" | head -n1)
-          if [ -z "$PREV_TAG" ]; then
-            # No previous tag: list all commits
-            COMMITS=$(git log --pretty=format:"- %s" HEAD)
-          else
-            COMMITS=$(git log --pretty=format:"- %s" "${PREV_TAG}..HEAD")
-          fi
-          # Remove CI/bot/dependency commits from the user-visible changelog
-          FILTERED=$(echo "$COMMITS" | grep -v -E "^- (ci:|chore:|Bump |Merge pull request|dependabot)" || true)
-          if [ -z "$FILTERED" ]; then
-            FILTERED="- General improvements and bug fixes"
-          fi
-          # Write to file so multiline is preserved
-          echo "$FILTERED" > /tmp/changelog_body.txt
-          echo "prev_tag=${PREV_TAG}" >> "$GITHUB_OUTPUT"
-
-      - name: Create release
-        id: create-release
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const tag = context.ref.replace('refs/tags/', '');
-            const commits = fs.readFileSync('/tmp/changelog_body.txt', 'utf8').trim();
-            const body = [
-              `## What's Changed`,
-              '',
-              commits,
-              '',
-              '---',
-              'Download the installer for your platform from the assets below.',
-            ].join('\n');
-            const { data } = await github.rest.repos.createRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag_name: tag,
-              name: `GPTBar ${tag}`,
-              body,
-              draft: false,
-              prerelease: tag.includes('-'),
-            });
-            core.setOutput('id', data.id);
-            core.setOutput('upload_url', data.upload_url);
+          $tag = "${{ github.ref_name }}" -replace '^v', ''
+          $conf = Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json
+          $ver = $conf.version
+          if ($tag -ne $ver) {
+            Write-Error "Tag ${{ github.ref_name }} does not match tauri.conf.json version $ver"
+            exit 1
+          }
+          Write-Host "Version match: $ver"
 
   build:
-    needs: create-release
-    permissions:
-      contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: 'macos-latest'
-            args: '--target aarch64-apple-darwin'
-            rust_target: 'aarch64-apple-darwin'
-          - platform: 'macos-latest'
-            args: '--target x86_64-apple-darwin'
-            rust_target: 'x86_64-apple-darwin'
-          - platform: 'ubuntu-22.04'
-            args: ''
-            rust_target: ''
-          - platform: 'windows-latest'
-            args: ''
-            rust_target: ''
-
-    runs-on: ${{ matrix.platform }}
-
+    needs: verify
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 'lts/*'
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.rust_target }}
+      - uses: dtolnay/rust-toolchain@stable
 
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
+      - uses: swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
 
-      - name: Install dependencies (Ubuntu only)
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-
       - name: Install frontend dependencies
         run: npm install
-
-      - name: Update version from tag
-        shell: bash
-        run: |
-          TAG="${{ github.ref_name }}"
-          VERSION="${TAG#v}"
-          # Update tauri.conf.json version
-          node -e "
-            const fs = require('fs');
-            const conf = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
-            conf.version = '$VERSION';
-            fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(conf, null, 2));
-            console.log('Updated version to', '$VERSION');
-          "
 
       - name: Build and upload release assets
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          releaseId: ${{ needs.create-release.outputs.release_id }}
-          args: ${{ matrix.args }}
+          tagName: ${{ github.ref_name }}
+          releaseName: 'GPTBar ${{ github.ref_name }}'
+          releaseBody: |
+            ## Installation
+
+            Download the `.exe` installer (NSIS) or the `.msi` package below.
+
+            Requires Windows 10 version 1803 or later.
+
+            ---
+
+            See [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for what changed.
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: false

@@ -32,8 +32,8 @@ fn open_db() -> Result<rusqlite::Connection, String> {
             .map_err(|e| format!("Failed to create history dir: {}", e))?;
     }
 
-    let conn =
-        rusqlite::Connection::open(&path).map_err(|e| format!("Failed to open history DB: {}", e))?;
+    let conn = rusqlite::Connection::open(&path)
+        .map_err(|e| format!("Failed to open history DB: {}", e))?;
 
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS usage_history (
@@ -167,7 +167,8 @@ pub fn export_history_csv() -> Result<String, String> {
         )
         .map_err(|e| format!("Failed to prepare CSV query: {}", e))?;
 
-    let mut csv = String::from("provider_id,timestamp,primary_percent,secondary_percent,tertiary_percent\n");
+    let mut csv =
+        String::from("provider_id,timestamp,primary_percent,secondary_percent,tertiary_percent\n");
 
     stmt.query_map([], |row| {
         Ok((
@@ -182,7 +183,14 @@ pub fn export_history_csv() -> Result<String, String> {
     .try_for_each(|row| {
         let (pid, ts, p, s, t) = row.map_err(|e| format!("Row error: {}", e))?;
         let fmt = |v: Option<f64>| v.map(|x| format!("{:.2}", x)).unwrap_or_default();
-        csv.push_str(&format!("{},{},{},{},{}\n", pid, ts, fmt(p), fmt(s), fmt(t)));
+        csv.push_str(&format!(
+            "{},{},{},{},{}\n",
+            pid,
+            ts,
+            fmt(p),
+            fmt(s),
+            fmt(t)
+        ));
         Ok::<_, String>(())
     })?;
 

@@ -5,6 +5,25 @@
   import { getVersion } from "@tauri-apps/api/app";
   import type { UsageSnapshot, AppConfig } from '$lib/types';
   import UsageBar from './UsageBar.svelte';
+  import { updateState, checkForUpdate, installUpdate } from '$lib/updateStore.svelte';
+
+  // Label for the manual "check for updates" control in About.
+  let updateButtonLabel = $derived(
+    updateState.phase === 'checking' ? 'Checking…'
+    : updateState.phase === 'available' ? `Install v${updateState.newVersion}`
+    : updateState.phase === 'downloading' ? `Downloading ${updateState.progress}%`
+    : updateState.phase === 'uptodate' ? 'Up to date'
+    : updateState.phase === 'error' ? 'Check failed — retry'
+    : 'Check for updates'
+  );
+
+  function handleUpdateButton() {
+    if (updateState.phase === 'available') {
+      installUpdate();
+    } else if (updateState.phase !== 'downloading' && updateState.phase !== 'ready') {
+      checkForUpdate(true);
+    }
+  }
 
   interface Props {
     providerId: string;
@@ -93,9 +112,11 @@
 
   // Close all modals
   function closeAllModals() {
+    const wasOpen = showAbout || showSettings;
     showAbout = false;
     showSettings = false;
     showExportMenu = false;
+    if (wasOpen) restoreFocus();
   }
 
   $effect(() => {
@@ -140,7 +161,34 @@
   // Dynamic version
   let appVersion = $state('...');
   $effect(() => {
-    getVersion().then((v: string) => { appVersion = v; }).catch(() => { appVersion = '0.2.0'; });
+    getVersion().then((v: string) => { appVersion = v; }).catch(() => { appVersion = '0.2.2'; });
+  });
+
+  // Transient save-error indicator
+  let saveError = $state('');
+  let saveErrorTimer: ReturnType<typeof setTimeout> | null = null;
+  function flashError(msg: string) {
+    saveError = msg;
+    if (saveErrorTimer) clearTimeout(saveErrorTimer);
+    saveErrorTimer = setTimeout(() => { saveError = ''; saveErrorTimer = null; }, 3000);
+  }
+
+  // Modal focus management
+  let settingsModalEl = $state<HTMLDivElement | null>(null);
+  let aboutModalEl = $state<HTMLDivElement | null>(null);
+  let lastFocused: HTMLElement | null = null;
+  function captureFocus() {
+    lastFocused = document.activeElement as HTMLElement | null;
+  }
+  function restoreFocus() {
+    if (lastFocused && typeof lastFocused.focus === 'function') lastFocused.focus();
+    lastFocused = null;
+  }
+  $effect(() => {
+    if (showSettings) settingsModalEl?.focus();
+  });
+  $effect(() => {
+    if (showAbout) aboutModalEl?.focus();
   });
 
   // Settings state
@@ -149,7 +197,6 @@
   let settingsLoading = $state(false);
   let localEnabledProviders = $state<string[]>([]);
   let notificationCooldown = $state(30);
-  let mutedProviders = $state<string[]>([]);
   let warningThreshold = $state(85);
   let criticalThreshold = $state(95);
   let apiKeys = $state<Record<string, string>>({});
@@ -158,19 +205,25 @@
   let historyPoints = $state<number[]>([]);
 
   function toggleAbout() {
-    showAbout = !showAbout;
-    showSettings = false;
+    if (!showAbout) {
+      captureFocus();
+      showAbout = true;
+      showSettings = false;
+    } else {
+      showAbout = false;
+      restoreFocus();
+    }
   }
 
   async function toggleSettings() {
     if (!showSettings) {
+      captureFocus();
       try {
         const config = await invoke<AppConfig>('get_config');
         refreshInterval = config.refresh_interval;
         startOnLogin = config.start_on_login;
         localEnabledProviders = [...config.enabled_providers];
         notificationCooldown = config.notification_cooldown_minutes ?? 30;
-        mutedProviders = [...(config.muted_providers ?? [])];
         warningThreshold = config.warning_threshold ?? 85;
         criticalThreshold = config.critical_threshold ?? 95;
         apiKeys = Object.fromEntries(
@@ -181,15 +234,19 @@
       } catch {
         localEnabledProviders = [...enabledProviders];
       }
+      showSettings = true;
+      showAbout = false;
+    } else {
+      showSettings = false;
+      restoreFocus();
     }
-    showSettings = !showSettings;
-    showAbout = false;
   }
 
   // Settings handlers
   async function setRefreshInterval(value: number) {
     refreshInterval = value;
-    try { await invoke('set_refresh_interval', { minutes: value }); } catch {}
+    try { await invoke('set_refresh_interval', { minutes: value }); }
+    catch (e) { console.error('Failed to set refresh interval:', e); flashError('Could not save refresh interval'); }
   }
 
   async function handleStartOnLoginChange(event: Event) {
@@ -202,18 +259,21 @@
 
   async function adjustThreshold(type: 'warning' | 'critical', delta: number) {
     if (type === 'warning') {
-      warningThreshold = Math.min(99, Math.max(50, warningThreshold + delta));
+      const next = Math.min(99, Math.max(50, warningThreshold + delta));
+      warningThreshold = Math.min(next, criticalThreshold - 1);
     } else {
-      criticalThreshold = Math.min(100, Math.max(51, criticalThreshold + delta));
+      const next = Math.min(100, Math.max(51, criticalThreshold + delta));
+      criticalThreshold = Math.max(next, warningThreshold + 1);
     }
     try {
       await invoke('set_notification_thresholds', { warning: warningThreshold, critical: criticalThreshold });
-    } catch {}
+    } catch (e) { console.error('Failed to set thresholds:', e); flashError('Could not save thresholds'); }
   }
 
   async function setCooldown(value: number) {
     notificationCooldown = value;
-    try { await invoke('set_notification_cooldown', { minutes: value }); } catch {}
+    try { await invoke('set_notification_cooldown', { minutes: value }); }
+    catch (e) { console.error('Failed to set cooldown:', e); flashError('Could not save cooldown'); }
   }
 
   async function adjustCooldown(delta: number) {
@@ -228,7 +288,7 @@
     try {
       await invoke('set_provider_api_key', { providerId, apiKey: value });
       if (value) await invoke('trigger_refresh');
-    } catch {}
+    } catch (e) { console.error('Failed to save API key:', e); flashError('Could not save API key'); }
   }
 
   async function handleProviderToggle(provId: string) {
@@ -257,7 +317,7 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = 'gptbar-history.json'; a.click();
       URL.revokeObjectURL(url);
-    } catch {}
+    } catch (e) { console.error('Failed to export JSON:', e); flashError('Export failed'); }
   }
 
   async function handleExportCsv() {
@@ -268,7 +328,7 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = 'gptbar-history.csv'; a.click();
       URL.revokeObjectURL(url);
-    } catch {}
+    } catch (e) { console.error('Failed to export CSV:', e); flashError('Export failed'); }
   }
 
   // Load sparkline history
@@ -467,6 +527,9 @@
         {/if}
       </div>
     </div>
+    {#if saveError}
+      <div class="save-error" role="alert">{saveError}</div>
+    {/if}
   {/if}
   </div>
 
@@ -478,6 +541,9 @@
       Settings
     </button>
     <div class="footer-right">
+      {#if isAvailable}
+        <button class="footer-link-subtle" onclick={onLogout}>Disconnect</button>
+      {/if}
       <button class="footer-link-subtle" onclick={toggleAbout}>About</button>
       <button class="footer-link-subtle" onclick={handleQuit}>Quit</button>
     </div>
@@ -487,8 +553,8 @@
   {#if showSettings}
     <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
     <div class="modal-overlay" onclick={toggleSettings} role="presentation">
-      <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_interactive_supports_focus -->
-      <div class="modal" onclick={(e) => e.stopPropagation()} role="dialog" aria-label="Settings" tabindex="-1">
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="modal" bind:this={settingsModalEl} onclick={(e) => e.stopPropagation()} onkeydown={(e) => { if (e.key === 'Escape') toggleSettings(); }} role="dialog" aria-modal="true" aria-label="Settings" tabindex="-1">
         <div class="modal-header">
           <div class="modal-header-left">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22D3EE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
@@ -512,7 +578,7 @@
                   <span class="settings-row-text" class:dimmed={!isEnabled}>{provider.name}</span>
                 </div>
                 <label class="toggle">
-                  <input type="checkbox" checked={isEnabled} onchange={() => handleProviderToggle(provider.id)} disabled={isEnabled && localEnabledProviders.length <= 1} />
+                  <input type="checkbox" aria-label="Enable {provider.name} provider" checked={isEnabled} onchange={() => handleProviderToggle(provider.id)} disabled={isEnabled && localEnabledProviders.length <= 1} />
                   <span class="toggle-slider"></span>
                 </label>
               </div>
@@ -535,6 +601,7 @@
                 <input
                   type="password"
                   class="api-key-input"
+                  aria-label="{provider.name} API key"
                   placeholder="Enter API key…"
                   value={apiKeys[provider.id] ?? ''}
                   onblur={(e) => handleApiKeyChange(provider.id, (e.target as HTMLInputElement).value)}
@@ -574,7 +641,7 @@
                 <span class="settings-row-hint">Launch with system startup</span>
               </div>
               <label class="toggle">
-                <input type="checkbox" checked={startOnLogin} onchange={handleStartOnLoginChange} disabled={settingsLoading} />
+                <input type="checkbox" aria-label="Start on login" checked={startOnLogin} onchange={handleStartOnLoginChange} disabled={settingsLoading} />
                 <span class="toggle-slider"></span>
               </label>
             </div>
@@ -646,6 +713,10 @@
               <span class="notif-hint">Min. time between repeat alerts</span>
             </div>
           </div>
+
+          {#if saveError}
+            <div class="save-error" role="alert">{saveError}</div>
+          {/if}
         </div>
       </div>
     </div>
@@ -655,8 +726,8 @@
   {#if showAbout}
     <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
     <div class="modal-overlay" onclick={toggleAbout} role="presentation">
-      <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_interactive_supports_focus -->
-      <div class="modal" onclick={(e) => e.stopPropagation()} role="dialog" aria-label="About GPTBar" tabindex="-1">
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="modal" bind:this={aboutModalEl} onclick={(e) => e.stopPropagation()} onkeydown={(e) => { if (e.key === 'Escape') toggleAbout(); }} role="dialog" aria-modal="true" aria-label="About GPTBar" tabindex="-1">
         <div class="modal-header">
           <div class="modal-header-left">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22D3EE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
@@ -697,6 +768,14 @@
               <span class="stat-label">License</span>
             </div>
           </div>
+
+          <button
+            class="about-update-btn"
+            onclick={handleUpdateButton}
+            disabled={updateState.phase === 'downloading' || updateState.phase === 'ready' || updateState.phase === 'checking'}
+          >
+            {updateButtonLabel}
+          </button>
 
           <span class="about-footer-text">Built with Rust + Tauri + Svelte</span>
         </div>
@@ -779,7 +858,7 @@
 
   .provider-email {
     font-size: 11px;
-    color: #64748B;
+    color: #CBD5E1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -787,7 +866,7 @@
 
   .provider-sub {
     font-size: 11px;
-    color: #64748B;
+    color: #CBD5E1;
   }
 
   .provider-meta {
@@ -809,7 +888,7 @@
 
   .updated-time {
     font-size: 10px;
-    color: #475569;
+    color: #CBD5E1;
   }
 
   /* ========== USAGE BARS ========== */
@@ -824,14 +903,14 @@
     font-family: 'JetBrains Mono', monospace;
     font-weight: 600;
     font-size: 10px;
-    color: #64748B;
+    color: #94A3B8;
     letter-spacing: 2px;
   }
 
   .loading-hint {
     font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
-    color: #475569;
+    color: #94A3B8;
     text-align: center;
   }
 
@@ -853,7 +932,7 @@
     font-family: 'JetBrains Mono', monospace;
     font-weight: 500;
     font-size: 10px;
-    color: #64748B;
+    color: #94A3B8;
     letter-spacing: 1.5px;
   }
 
@@ -944,6 +1023,16 @@
 
   .btn-retry:hover:not(:disabled) { background: rgba(239, 68, 68, 0.3); }
   .btn-retry:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .save-error {
+    margin: 0 16px 8px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    background: rgba(239, 68, 68, 0.12);
+    color: #FCA5A5;
+    font-size: 11px;
+    text-align: center;
+  }
 
   /* ========== ACTION BUTTONS ========== */
   .actions-row {
@@ -1061,14 +1150,14 @@
     gap: 6px;
     border: none;
     background: none;
-    color: #64748B;
+    color: #94A3B8;
     font-family: 'Inter', sans-serif;
     font-size: 11px;
     cursor: pointer;
     padding: 4px 0;
   }
 
-  .footer-link:hover { color: #94A3B8; }
+  .footer-link:hover { color: #CBD5E1; }
 
   .footer-right {
     display: flex;
@@ -1079,14 +1168,14 @@
   .footer-link-subtle {
     border: none;
     background: none;
-    color: #475569;
+    color: #94A3B8;
     font-family: 'Inter', sans-serif;
     font-size: 11px;
     cursor: pointer;
     padding: 4px 0;
   }
 
-  .footer-link-subtle:hover { color: #94A3B8; }
+  .footer-link-subtle:hover { color: #CBD5E1; }
 
   /* ========== AUTH (NOT AUTHENTICATED) ========== */
   .auth-content {
@@ -1178,6 +1267,7 @@
     align-items: center;
     justify-content: center;
     z-index: 100;
+    animation: overlay-fade 0.18s ease-out both;
   }
 
   .modal {
@@ -1190,6 +1280,17 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    animation: modal-pop 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @keyframes overlay-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes modal-pop {
+    from { opacity: 0; transform: translateY(8px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
   }
 
   .modal-header {
@@ -1244,7 +1345,7 @@
     font-family: 'JetBrains Mono', monospace;
     font-weight: 600;
     font-size: 10px;
-    color: #64748B;
+    color: #94A3B8;
     letter-spacing: 2px;
     padding: 14px 16px 8px;
   }
@@ -1307,7 +1408,7 @@
 
   .settings-row-hint {
     font-size: 11px;
-    color: #64748B;
+    color: #94A3B8;
   }
 
   .section-divider {
@@ -1506,7 +1607,7 @@
 
   .notif-hint {
     font-size: 10px;
-    color: #64748B;
+    color: #94A3B8;
   }
 
   /* ========== ABOUT MODAL ========== */
@@ -1560,55 +1661,6 @@
     margin: 0;
   }
 
-  .update-banner {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-    padding: 12px 14px;
-    border-radius: 10px;
-    background: rgba(34, 211, 238, 0.09);
-    border: 1px solid rgba(34, 211, 238, 0.27);
-  }
-
-  .update-left {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
-
-  .update-text {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-  }
-
-  .update-title {
-    font-weight: 600;
-    font-size: 12px;
-    color: #22D3EE;
-  }
-
-  .update-ver {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    color: #64748B;
-  }
-
-  .btn-install {
-    padding: 5px 12px;
-    border: none;
-    border-radius: 6px;
-    background: #22D3EE;
-    color: #0A0F1C;
-    font-weight: 700;
-    font-size: 11px;
-    cursor: pointer;
-  }
-
-  .btn-install:disabled { opacity: 0.5; cursor: not-allowed; }
-
   .about-stats {
     display: flex;
     gap: 8px;
@@ -1635,12 +1687,53 @@
 
   .stat-label {
     font-size: 11px;
-    color: #64748B;
+    color: #94A3B8;
   }
 
   .about-footer-text {
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
-    color: #475569;
+    color: #94A3B8;
+  }
+
+  .about-update-btn {
+    font-size: 11px;
+    font-weight: 600;
+    color: #22D3EE;
+    background: rgba(34, 211, 238, 0.08);
+    border: 1px solid rgba(34, 211, 238, 0.2);
+    border-radius: 6px;
+    padding: 6px 14px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+
+  .about-update-btn:hover:not(:disabled) {
+    background: rgba(34, 211, 238, 0.14);
+    border-color: rgba(34, 211, 238, 0.35);
+  }
+
+  .about-update-btn:disabled {
+    cursor: default;
+    opacity: 0.6;
+  }
+
+  .provider-card {
+    animation: card-rise 0.32s ease-out both;
+  }
+
+  @keyframes card-rise {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .modal-overlay,
+    .modal,
+    .provider-card,
+    .about-update-btn {
+      animation: none;
+    }
   }
 </style>

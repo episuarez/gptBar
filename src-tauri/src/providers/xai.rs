@@ -94,7 +94,9 @@ impl XaiProvider {
         }
 
         // Try system keychain
-        if let Ok(entry) = keyring::Entry::new("xai", "api_key") {
+        if let Ok(entry) =
+            keyring::Entry::new(crate::config::keychain_service(self.id()), "api_key")
+        {
             if let Ok(key) = entry.get_password() {
                 tracing::info!("Found xAI API key from system keychain");
                 *self.api_key.write().await = Some(key.clone());
@@ -213,7 +215,7 @@ impl Provider for XaiProvider {
 
     async fn login(&self) -> Result<bool, ProviderError> {
         // Open xAI API key page
-        if let Err(e) = opener::open("https://console.x.ai/") {
+        if let Err(e) = tauri_plugin_opener::open_url("https://console.x.ai/", None::<&str>) {
             tracing::warn!("Failed to open browser: {}", e);
         }
         Ok(false)
@@ -221,7 +223,9 @@ impl Provider for XaiProvider {
 
     async fn logout(&self) -> Result<(), ProviderError> {
         *self.api_key.write().await = None;
-        if let Ok(entry) = keyring::Entry::new("xai", "api_key") {
+        if let Ok(entry) =
+            keyring::Entry::new(crate::config::keychain_service(self.id()), "api_key")
+        {
             let _ = entry.delete_credential();
         }
         Ok(())

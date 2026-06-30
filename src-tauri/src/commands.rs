@@ -6,7 +6,7 @@ use std::sync::Arc;
 use tauri::Manager;
 use tokio::sync::RwLock;
 
-use crate::config::{AppConfig, ProviderSettings};
+use crate::config::AppConfig;
 use crate::providers::{Provider, ProviderMetadata, UsageSnapshot};
 use crate::AppState;
 
@@ -25,15 +25,12 @@ pub enum TrayStatus {
 /// - Warning (>= warning threshold): yellow icon
 /// - Critical (>= critical threshold): red icon
 #[tauri::command]
-pub fn update_tray_status(
-    app: tauri::AppHandle,
-    status: TrayStatus,
-) -> Result<(), String> {
+pub fn update_tray_status(app: tauri::AppHandle, status: TrayStatus) -> Result<(), String> {
     // Generate a 32x32 RGBA pixel buffer with a bar chart icon (4 rounded bars)
     let color: [u8; 3] = match status {
-        TrayStatus::Normal => [34, 211, 238],    // cyan #22D3EE
-        TrayStatus::Warning => [245, 158, 11],   // amber #F59E0B
-        TrayStatus::Critical => [239, 68, 68],   // red #EF4444
+        TrayStatus::Normal => [34, 211, 238],  // cyan #22D3EE
+        TrayStatus::Warning => [245, 158, 11], // amber #F59E0B
+        TrayStatus::Critical => [239, 68, 68], // red #EF4444
     };
 
     const SIZE: u32 = 32;
@@ -138,9 +135,9 @@ pub fn resize_window(app: tauri::AppHandle, height: u32) -> Result<(), String> {
         if let (Some(p), Some(s)) = (pos, old_size) {
             let old_bottom = p.y + s.height as i32;
             let new_y = old_bottom - clamped;
-            let _ = window.set_position(tauri::Position::Physical(
-                tauri::PhysicalPosition::new(p.x, new_y),
-            ));
+            let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(
+                p.x, new_y,
+            )));
         }
     }
     Ok(())
@@ -155,16 +152,17 @@ pub async fn fetch_usage(
     state.claude.fetch().await.map_err(|e| e.to_string())
 }
 
-/// Gets the cached usage snapshot for Claude
+/// Gets the cached usage snapshot for Claude.
+///
+/// PLACEHOLDER: always returns `Ok(None)`. Reading the RefreshAgent's stored
+/// snapshot would require downcasting the `Arc<dyn Agent>` returned by the
+/// manager to `RefreshAgent`, which the `Agent` trait doesn't currently
+/// expose (no `as_any`). The frontend falls back to `fetch_provider_usage`.
+/// Kept (and registered in the invoke_handler) so the IPC surface is stable.
 #[tauri::command]
 pub async fn get_cached_usage(
-    state: tauri::State<'_, Arc<RwLock<AppState>>>,
+    _state: tauri::State<'_, Arc<RwLock<AppState>>>,
 ) -> Result<Option<UsageSnapshot>, String> {
-    let state = state.read().await;
-    if let Some(_agent) = state.agent_manager.get("refresh").await {
-        // Downcast to RefreshAgent would be needed here
-        // For now, return None
-    }
     Ok(None)
 }
 
@@ -179,36 +177,28 @@ pub async fn is_claude_available(
 
 /// Initiates Claude login
 #[tauri::command]
-pub async fn login_claude(
-    state: tauri::State<'_, Arc<RwLock<AppState>>>,
-) -> Result<bool, String> {
+pub async fn login_claude(state: tauri::State<'_, Arc<RwLock<AppState>>>) -> Result<bool, String> {
     let state = state.read().await;
     state.claude.login().await.map_err(|e| e.to_string())
 }
 
 /// Logs out from Claude
 #[tauri::command]
-pub async fn logout_claude(
-    state: tauri::State<'_, Arc<RwLock<AppState>>>,
-) -> Result<(), String> {
+pub async fn logout_claude(state: tauri::State<'_, Arc<RwLock<AppState>>>) -> Result<(), String> {
     let state = state.read().await;
     state.claude.logout().await.map_err(|e| e.to_string())
 }
 
 /// Reloads OAuth token from Claude Code CLI credentials
 #[tauri::command]
-pub async fn reload_token(
-    state: tauri::State<'_, Arc<RwLock<AppState>>>,
-) -> Result<bool, String> {
+pub async fn reload_token(state: tauri::State<'_, Arc<RwLock<AppState>>>) -> Result<bool, String> {
     let state = state.read().await;
     state.claude.reload_token().await.map_err(|e| e.to_string())
 }
 
 /// Triggers an immediate refresh of usage data
 #[tauri::command]
-pub async fn trigger_refresh(
-    state: tauri::State<'_, Arc<RwLock<AppState>>>,
-) -> Result<(), String> {
+pub async fn trigger_refresh(state: tauri::State<'_, Arc<RwLock<AppState>>>) -> Result<(), String> {
     let state = state.read().await;
     state
         .agent_manager
@@ -278,7 +268,7 @@ pub fn is_autostart_enabled() -> bool {
 /// Sets the notification thresholds (warning and critical percentages)
 #[tauri::command]
 pub fn set_notification_thresholds(warning: f64, critical: f64) -> Result<(), String> {
-    if warning < 0.0 || warning > 100.0 || critical < 0.0 || critical > 100.0 {
+    if !(0.0..=100.0).contains(&warning) || !(0.0..=100.0).contains(&critical) {
         return Err("Thresholds must be between 0 and 100".to_string());
     }
     if warning >= critical {
@@ -483,7 +473,7 @@ pub fn set_provider_enabled(provider_id: String, enabled: bool) -> Result<(), St
     config
         .provider_settings
         .entry(provider_id)
-        .or_insert_with(ProviderSettings::default)
+        .or_default()
         .enabled = enabled;
 
     config.save()
@@ -497,41 +487,34 @@ pub fn set_provider_order(order: Vec<String>) -> Result<(), String> {
     config.save()
 }
 
-/// Sets the API key for a provider
+/// Sets the API key for a provider.
+///
+/// The secret is stored ONLY in the OS keychain, never written to config.json.
+/// We also scrub any plaintext key that older builds may have persisted.
 #[tauri::command]
 pub fn set_provider_api_key(provider_id: String, api_key: String) -> Result<(), String> {
     let mut config = AppConfig::load();
 
+    // Ensure the provider has a settings entry (for the `enabled` flag) but
+    // never persist the raw key. Scrub any key persisted by older versions.
     config
         .provider_settings
         .entry(provider_id.clone())
-        .or_insert_with(ProviderSettings::default)
-        .api_key = if api_key.is_empty() {
-        None
-    } else {
-        Some(api_key)
-    };
+        .or_default()
+        .api_key = None;
 
     config.save()?;
 
-    // Also store in system keychain for security
-    if let Ok(entry) = keyring::Entry::new(&provider_id, "api_key") {
-        if config
-            .provider_settings
-            .get(&provider_id)
-            .and_then(|s| s.api_key.as_ref())
-            .is_some()
-        {
-            let key = config.provider_settings[&provider_id]
-                .api_key
-                .as_ref()
-                .unwrap();
-            let _ = entry.set_password(key);
-        } else {
+    // Store the secret only in the system keychain, under the centralized
+    // service name so the provider can actually read it back.
+    if let Ok(entry) = keyring::Entry::new(crate::config::keychain_service(&provider_id), "api_key")
+    {
+        if api_key.is_empty() {
             let _ = entry.delete_credential();
+        } else {
+            let _ = entry.set_password(&api_key);
         }
     }
 
     Ok(())
 }
-

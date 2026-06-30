@@ -7,8 +7,8 @@ mod claude_integration {
     use wiremock::matchers::{header, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
-    use crate::providers::claude::{ClaudeConfig, ClaudeProvider};
     use crate::providers::base::Provider;
+    use crate::providers::claude::{ClaudeConfig, ClaudeProvider};
 
     fn make_provider(base_url: &str) -> ClaudeProvider {
         let config = ClaudeConfig {
@@ -23,7 +23,7 @@ mod claude_integration {
         let server = MockServer::start().await;
 
         Mock::given(method("GET"))
-            .and(path("/api/organizations/unknown/claude_ai/token_counts_for_oauth_token"))
+            .and(path("/api/oauth/usage"))
             .and(header("Authorization", "Bearer sk-ant-oat-test"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
                 "five_hour": { "utilization": 42.5, "resets_at": "2026-03-11T10:00:00Z" },
@@ -60,8 +60,11 @@ mod claude_integration {
         assert!(result.is_err());
         let err_str = result.unwrap_err().to_string();
         assert!(
-            err_str.contains("Authentication") || err_str.contains("auth") || err_str.contains("401"),
-            "Expected auth error, got: {}", err_str
+            err_str.contains("Authentication")
+                || err_str.contains("auth")
+                || err_str.contains("401"),
+            "Expected auth error, got: {}",
+            err_str
         );
     }
 
@@ -123,11 +126,11 @@ mod claude_integration {
 
 #[cfg(test)]
 mod openai_integration {
-    use wiremock::matchers::{header, method, path, query_param};
+    use wiremock::matchers::{header, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
-    use crate::providers::openai::{OpenAIConfig, OpenAIProvider};
     use crate::providers::base::Provider;
+    use crate::providers::openai::{OpenAIConfig, OpenAIProvider};
 
     fn make_provider(base_url: &str) -> OpenAIProvider {
         let config = OpenAIConfig {
@@ -192,7 +195,8 @@ mod openai_integration {
         let err = result.unwrap_err().to_string();
         assert!(
             err.contains("Invalid") || err.contains("auth") || err.contains("Auth"),
-            "Expected auth error, got: {}", err
+            "Expected auth error, got: {}",
+            err
         );
     }
 
@@ -210,7 +214,8 @@ mod openai_integration {
         let err = result.unwrap_err().to_string();
         assert!(
             err.contains("Authentication required") || err.contains("auth"),
-            "Expected auth required, got: {}", err
+            "Expected auth required, got: {}",
+            err
         );
     }
 
@@ -249,8 +254,8 @@ mod xai_integration {
     use wiremock::matchers::{header, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
-    use crate::providers::xai::{XaiConfig, XaiProvider};
     use crate::providers::base::Provider;
+    use crate::providers::xai::{XaiConfig, XaiProvider};
 
     fn make_provider(base_url: &str) -> XaiProvider {
         let config = XaiConfig {

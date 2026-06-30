@@ -44,22 +44,41 @@
       checkScroll();
     }
   }
+
+  // Arrow-key navigation between tabs
+  let tabEls = $state<HTMLButtonElement[]>([]);
+
+  function handleTabKeydown(event: KeyboardEvent, index: number) {
+    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+    event.preventDefault();
+    const dir = event.key === 'ArrowRight' ? 1 : -1;
+    const next = (index + dir + providers.length) % providers.length;
+    onSelect(providers[next]);
+    tabEls[next]?.focus();
+  }
 </script>
 
 <div class="tab-bar">
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="tab-scroll"
+    role="tablist"
+    aria-label="Providers"
     bind:this={scrollContainer}
     onscroll={checkScroll}
     onwheel={handleWheel}
   >
-    {#each providers as providerId}
+    {#each providers as providerId, i}
       {@const isActive = activeProvider === providerId}
       <button
         class="tab"
         class:active={isActive}
+        role="tab"
+        aria-selected={isActive}
+        tabindex={isActive ? 0 : -1}
+        bind:this={tabEls[i]}
         onclick={() => onSelect(providerId)}
+        onkeydown={(e) => handleTabKeydown(e, i)}
       >
         <span
           class="tab-dot"
@@ -150,7 +169,7 @@
     font-family: 'JetBrains Mono', monospace;
     font-weight: 500;
     font-size: 11px;
-    color: #64748B;
+    color: #94A3B8;
     white-space: nowrap;
   }
 

@@ -74,9 +74,31 @@
   }
 
   .bar-fill {
+    position: relative;
     height: 100%;
     border-radius: 3px;
-    transition: width 0.4s ease-out;
+    transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    overflow: hidden;
+  }
+
+  /* Soft light sweep across the filled portion */
+  .bar-fill::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.25),
+      transparent
+    );
+    transform: translateX(-100%);
+    animation: bar-shimmer 2.8s ease-in-out infinite;
+  }
+
+  @keyframes bar-shimmer {
+    0% { transform: translateX(-100%); }
+    60%, 100% { transform: translateX(100%); }
   }
 
   .bar-fill.normal {
@@ -92,9 +114,14 @@
   }
 
   .reset-time {
-    color: #475569;
+    color: #CBD5E1;
     font-family: 'JetBrains Mono', monospace;
     font-weight: 400;
     font-size: 10px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bar-fill { transition: none; }
+    .bar-fill::after { animation: none; display: none; }
   }
 </style>

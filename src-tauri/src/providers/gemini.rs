@@ -124,7 +124,9 @@ impl GeminiProvider {
         }
 
         // Try system keychain
-        if let Ok(entry) = keyring::Entry::new("google-gemini", "api_key") {
+        if let Ok(entry) =
+            keyring::Entry::new(crate::config::keychain_service(self.id()), "api_key")
+        {
             if let Ok(key) = entry.get_password() {
                 tracing::info!("Found Gemini API key from system keychain");
                 *self.api_key.write().await = Some(key.clone());
@@ -139,15 +141,20 @@ impl GeminiProvider {
     async fn fetch_usage(&self, api_key: &str) -> Result<UsageSnapshot, ProviderError> {
         let config = self.config.read().await;
 
-        // Test API access by listing models
-        let models_url = format!("{}/v1beta/models?key={}", config.api_base_url, api_key);
+        // Test API access by listing models.
+        // The API key goes in the x-goog-api-key header, never in the URL query
+        // string (URLs leak into logs, history, and proxies).
+        let models_url = format!("{}/v1beta/models", config.api_base_url);
 
-        let response = self.client.get(&models_url).send().await?;
+        let response = self
+            .client
+            .get(&models_url)
+            .header("x-goog-api-key", api_key)
+            .send()
+            .await?;
 
         let status = response.status();
-        if status == reqwest::StatusCode::UNAUTHORIZED
-            || status == reqwest::StatusCode::FORBIDDEN
-        {
+        if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
             return Err(ProviderError::AuthFailed("Invalid API key".into()));
         }
 
@@ -155,9 +162,10 @@ impl GeminiProvider {
             return Err(ProviderError::Parse(format!("HTTP {}", status)));
         }
 
-        let models: GeminiModelsResponse = response.json().await.map_err(|e| {
-            ProviderError::Parse(format!("Failed to parse models response: {}", e))
-        })?;
+        let models: GeminiModelsResponse = response
+            .json()
+            .await
+            .map_err(|e| ProviderError::Parse(format!("Failed to parse models response: {}", e)))?;
 
         let mut snapshot = UsageSnapshot::new();
 
@@ -165,15 +173,16 @@ impl GeminiProvider {
         // We'll show availability status instead
         let model_count = models.models.as_ref().map(|m| m.len()).unwrap_or(0);
 
-        let identity = IdentitySnapshot::new()
-            .with_plan(if model_count > 0 { "Active" } else { "Unknown" });
+        let identity =
+            IdentitySnapshot::new().with_plan(if model_count > 0 { "Active" } else { "Unknown" });
 
         // Create a simple status indicator
         // Note: Gemini doesn't expose usage quotas via API like OpenAI does
         // We can only verify the key works
         snapshot = snapshot
             .with_primary(
-                RateWindow::new(0.0).with_reset_description(format!("{} models available", model_count)),
+                RateWindow::new(0.0)
+                    .with_reset_description(format!("{} models available", model_count)),
             )
             .with_identity(identity);
 
@@ -218,7 +227,9 @@ impl Provider for GeminiProvider {
 
     async fn login(&self) -> Result<bool, ProviderError> {
         // Gemini uses API keys
-        if let Err(e) = opener::open("https://aistudio.google.com/app/apikey") {
+        if let Err(e) =
+            tauri_plugin_opener::open_url("https://aistudio.google.com/app/apikey", None::<&str>)
+        {
             tracing::warn!("Failed to open browser: {}", e);
         }
         Ok(false)

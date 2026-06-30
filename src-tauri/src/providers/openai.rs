@@ -165,7 +165,9 @@ impl OpenAIProvider {
         }
 
         // Try system keychain
-        if let Ok(entry) = keyring::Entry::new("openai", "api_key") {
+        if let Ok(entry) =
+            keyring::Entry::new(crate::config::keychain_service(self.id()), "api_key")
+        {
             if let Ok(key) = entry.get_password() {
                 tracing::info!("Found OpenAI API key from system keychain");
                 *self.api_key.write().await = Some(key.clone());
@@ -180,6 +182,8 @@ impl OpenAIProvider {
     async fn fetch_usage(&self, api_key: &str) -> Result<UsageSnapshot, ProviderError> {
         let config = self.config.read().await;
 
+        // NOTE: /v1/dashboard/billing/* endpoints are deprecated by OpenAI.
+        // Out of scope here; left as-is.
         // Fetch subscription/billing info
         let subscription_url = format!("{}/v1/dashboard/billing/subscription", config.api_base_url);
 
@@ -202,12 +206,11 @@ impl OpenAIProvider {
                 // Get current month usage
                 let now = chrono::Utc::now();
                 let start_date = format!("{}-{:02}-01", now.year(), now.month());
-                let end_date = format!(
-                    "{}-{:02}-{:02}",
-                    now.year(),
-                    now.month(),
-                    now.day() + 1
-                );
+                // Use real date arithmetic so month-end (e.g. day 31) doesn't
+                // produce an invalid date like "2024-01-32".
+                let end_date = (now.date_naive() + chrono::Duration::days(1))
+                    .format("%Y-%m-%d")
+                    .to_string();
 
                 let usage_url = format!(
                     "{}/v1/dashboard/billing/usage?start_date={}&end_date={}",
@@ -233,11 +236,10 @@ impl OpenAIProvider {
                             };
 
                             snapshot = snapshot.with_primary(
-                                RateWindow::new(percent)
-                                    .with_reset_description(format!(
-                                        "${:.2} / ${:.2}",
-                                        used_usd, limit
-                                    )),
+                                RateWindow::new(percent).with_reset_description(format!(
+                                    "${:.2} / ${:.2}",
+                                    used_usd, limit
+                                )),
                             );
                         }
                     }
@@ -295,7 +297,9 @@ impl Provider for OpenAIProvider {
     async fn login(&self) -> Result<bool, ProviderError> {
         // OpenAI uses API keys, not OAuth login
         // Open the API keys page
-        if let Err(e) = opener::open("https://platform.openai.com/api-keys") {
+        if let Err(e) =
+            tauri_plugin_opener::open_url("https://platform.openai.com/api-keys", None::<&str>)
+        {
             tracing::warn!("Failed to open browser: {}", e);
         }
         Ok(false)

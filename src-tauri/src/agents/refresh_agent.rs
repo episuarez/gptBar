@@ -56,9 +56,13 @@ pub struct RefreshAgent {
     config: RefreshConfig,
     providers: RwLock<Vec<Arc<dyn Provider>>>,
     status: RwLock<AgentStatus>,
-    cancel_token: CancellationToken,
+    /// Replaced with a fresh token on every `start()` so a stop()/start()
+    /// cycle works (a cancelled token stays cancelled forever).
+    cancel_token: RwLock<CancellationToken>,
     snapshots: RwLock<std::collections::HashMap<String, UsageSnapshot>>,
     on_update: RwLock<Option<UsageCallback>>,
+    // NOTE: the on_update callback / snapshot-push notification pipeline is
+    // currently dead-wired in lib.rs (no callback is registered). Out of scope.
 }
 
 impl RefreshAgent {
@@ -73,7 +77,7 @@ impl RefreshAgent {
             config,
             providers: RwLock::new(Vec::new()),
             status: RwLock::new(AgentStatus::Idle),
-            cancel_token: CancellationToken::new(),
+            cancel_token: RwLock::new(CancellationToken::new()),
             snapshots: RwLock::new(std::collections::HashMap::new()),
             on_update: RwLock::new(None),
         }
@@ -114,14 +118,21 @@ impl RefreshAgent {
 
     /// Fetches data from all providers once
     async fn fetch_all(&self) {
+        // Read enabled state from config so toggling a provider in the UI takes
+        // effect on the next cycle (providers' own is_enabled() is hardcoded).
+        let config = crate::config::AppConfig::load();
         let providers = self.providers.read().await.clone();
 
         for provider in providers {
-            if !provider.is_enabled() {
+            let provider_id = provider.id().to_string();
+
+            // Gate on config: skip providers the user has disabled. Providers
+            // the config doesn't know about (e.g. test mocks) are never gated.
+            if config.provider_settings.contains_key(&provider_id)
+                && !config.is_provider_enabled(&provider_id)
+            {
                 continue;
             }
-
-            let provider_id = provider.id().to_string();
 
             match provider.fetch().await {
                 Ok(snapshot) => {
@@ -182,9 +193,13 @@ impl Agent for RefreshAgent {
         // Set status to running
         *self.status.write().await = AgentStatus::Running;
 
-        // Reset cancellation token
-        // Note: In a real implementation, we'd need to handle this differently
-        // since CancellationToken doesn't have a reset method
+        // Reset cancellation token: a previously-cancelled token stays cancelled
+        // forever, so install a fresh one and clone it for this run's loop.
+        let cancel_token = {
+            let mut guard = self.cancel_token.write().await;
+            *guard = CancellationToken::new();
+            guard.clone()
+        };
 
         // Fetch immediately if configured
         if self.config.fetch_on_start {
@@ -197,7 +212,7 @@ impl Agent for RefreshAgent {
                 _ = tokio::time::sleep(self.config.interval) => {
                     self.fetch_all().await;
                 }
-                _ = self.cancel_token.cancelled() => {
+                _ = cancel_token.cancelled() => {
                     tracing::info!("Refresh agent cancelled");
                     break;
                 }
@@ -217,8 +232,8 @@ impl Agent for RefreshAgent {
             }
         }
 
-        // Cancel the token
-        self.cancel_token.cancel();
+        // Cancel the token (the next start() will install a fresh one)
+        self.cancel_token.read().await.cancel();
 
         // Wait a bit for the agent to stop
         tokio::time::sleep(Duration::from_millis(100)).await;
@@ -255,10 +270,6 @@ mod tests {
             Self {
                 fetch_count: counter,
             }
-        }
-
-        fn fetch_count(&self) -> u32 {
-            self.fetch_count.load(Ordering::SeqCst)
         }
     }
 

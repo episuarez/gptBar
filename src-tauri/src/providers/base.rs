@@ -177,16 +177,16 @@ impl UsageSnapshot {
 
     /// Returns true if any window is at warning level
     pub fn has_warning(&self) -> bool {
-        self.primary.as_ref().map_or(false, |w| w.is_warning())
-            || self.secondary.as_ref().map_or(false, |w| w.is_warning())
-            || self.tertiary.as_ref().map_or(false, |w| w.is_warning())
+        self.primary.as_ref().is_some_and(|w| w.is_warning())
+            || self.secondary.as_ref().is_some_and(|w| w.is_warning())
+            || self.tertiary.as_ref().is_some_and(|w| w.is_warning())
     }
 
     /// Returns true if any window is at critical level
     pub fn has_critical(&self) -> bool {
-        self.primary.as_ref().map_or(false, |w| w.is_critical())
-            || self.secondary.as_ref().map_or(false, |w| w.is_critical())
-            || self.tertiary.as_ref().map_or(false, |w| w.is_critical())
+        self.primary.as_ref().is_some_and(|w| w.is_critical())
+            || self.secondary.as_ref().is_some_and(|w| w.is_critical())
+            || self.tertiary.as_ref().is_some_and(|w| w.is_critical())
     }
 }
 

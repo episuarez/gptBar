@@ -37,7 +37,9 @@ use tauri::{
 };
 
 use agents::{AgentManager, NotificationAgent, RefreshAgent};
-use providers::{ClaudeProvider, CodexProvider, GeminiProvider, OpenAIProvider, ProviderRegistry, XaiProvider};
+use providers::{
+    ClaudeProvider, CodexProvider, GeminiProvider, OpenAIProvider, ProviderRegistry, XaiProvider,
+};
 
 /// Application state shared across the Tauri app
 pub struct AppState {
@@ -116,6 +118,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             // Create app state
             let state = tokio::runtime::Runtime::new()
@@ -173,8 +177,12 @@ pub fn run() {
                                         tauri::Position::Logical(l) => (l.x as i32, l.y as i32),
                                     };
                                     let (tray_w, _tray_h) = match rect.size {
-                                        tauri::Size::Physical(s) => (s.width as i32, s.height as i32),
-                                        tauri::Size::Logical(s) => (s.width as i32, s.height as i32),
+                                        tauri::Size::Physical(s) => {
+                                            (s.width as i32, s.height as i32)
+                                        }
+                                        tauri::Size::Logical(s) => {
+                                            (s.width as i32, s.height as i32)
+                                        }
                                     };
 
                                     // Position: horizontally centered on tray icon, above the taskbar

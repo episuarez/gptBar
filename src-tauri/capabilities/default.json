@@ -7,6 +7,9 @@
     "core:default",
     "opener:default",
     "shell:allow-open",
-    "process:allow-exit"
+    "process:allow-exit",
+    "process:allow-restart",
+    "updater:default",
+    "notification:default"
   ]
 }

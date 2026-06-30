@@ -163,17 +163,21 @@ impl Sanitizer {
         if s.len() <= visible_chars * 2 {
             "****".to_string()
         } else {
-            format!("{}...{}", &s[..visible_chars], &s[s.len() - visible_chars..])
+            format!(
+                "{}...{}",
+                &s[..visible_chars],
+                &s[s.len() - visible_chars..]
+            )
         }
     }
 
     /// Escapes a string for safe display in logs (no HTML interpretation)
     pub fn escape_for_log(s: &str) -> String {
-        s.replace('<', "&lt;")
+        s.replace('&', "&amp;")
+            .replace('<', "&lt;")
             .replace('>', "&gt;")
             .replace('"', "&quot;")
             .replace('\'', "&#x27;")
-            .replace('&', "&amp;")
     }
 }
 
@@ -250,7 +254,10 @@ mod tests {
 
     #[test]
     fn test_validate_input_empty() {
-        assert_eq!(Sanitizer::validate_input(""), Err(SanitizerError::EmptyInput));
+        assert_eq!(
+            Sanitizer::validate_input(""),
+            Err(SanitizerError::EmptyInput)
+        );
     }
 
     #[test]
@@ -314,10 +321,7 @@ mod tests {
     #[test]
     fn test_escape_for_log() {
         assert_eq!(Sanitizer::escape_for_log("<script>"), "&lt;script&gt;");
-        assert_eq!(
-            Sanitizer::escape_for_log("a & b"),
-            "a &amp; b"
-        );
+        assert_eq!(Sanitizer::escape_for_log("a & b"), "a &amp; b");
         assert_eq!(
             Sanitizer::escape_for_log("\"quoted\""),
             "&quot;quoted&quot;"

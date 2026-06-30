@@ -154,14 +154,12 @@ impl NotificationAgent {
                 if let Some(level) = level {
                     // Use a composite key for cooldown: provider + window
                     let cooldown_key = format!("{}:{}", provider_id, window_name);
-                    if self.should_notify_with_cooldown(&cooldown_key, effective_cooldown).await {
-                        self.send_window_notification(
-                            provider_id,
-                            window_name,
-                            w,
-                            level,
-                        )
-                        .await;
+                    if self
+                        .should_notify_with_cooldown(&cooldown_key, effective_cooldown)
+                        .await
+                    {
+                        self.send_window_notification(provider_id, window_name, w, level)
+                            .await;
                     }
                 }
             }
@@ -507,7 +505,10 @@ mod tests {
 
         tokio::time::sleep(Duration::from_millis(50)).await;
         let msgs = messages.read().await;
-        assert!(!msgs.is_empty(), "Should have sent a notification for primary window");
+        assert!(
+            !msgs.is_empty(),
+            "Should have sent a notification for primary window"
+        );
     }
 
     #[tokio::test]
@@ -535,7 +536,10 @@ mod tests {
 
         tokio::time::sleep(Duration::from_millis(50)).await;
         let msgs = messages.read().await;
-        assert!(!msgs.is_empty(), "Should have sent a notification for secondary window");
+        assert!(
+            !msgs.is_empty(),
+            "Should have sent a notification for secondary window"
+        );
     }
 
     #[tokio::test]
@@ -563,7 +567,10 @@ mod tests {
 
         tokio::time::sleep(Duration::from_millis(50)).await;
         let msgs = messages.read().await;
-        assert!(!msgs.is_empty(), "Should have sent a notification for tertiary window");
+        assert!(
+            !msgs.is_empty(),
+            "Should have sent a notification for tertiary window"
+        );
     }
 
     #[tokio::test]
@@ -592,7 +599,8 @@ mod tests {
         let msgs = messages.read().await;
         // Message should include which window triggered (e.g. "primary" or window description)
         assert!(
-            msgs.iter().any(|m| m.contains("primary") || m.contains("5h") || m.contains("300")),
+            msgs.iter()
+                .any(|m| m.contains("primary") || m.contains("5h") || m.contains("300")),
             "Notification message should identify the window. Got: {:?}",
             *msgs
         );

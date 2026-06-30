@@ -168,7 +168,7 @@ impl ClaudeProvider {
                             Ok(creds) => {
                                 if let Some(oauth) = creds.claude_ai_oauth {
                                     if let Some(token) = oauth.access_token {
-                                        tracing::info!("Found Claude Code OAuth token ({}...)", &token[..20.min(token.len())]);
+                                        tracing::info!("Found Claude Code OAuth token");
                                         *self.oauth_token.write().await = Some(token.clone());
                                         return Some(token);
                                     } else {
@@ -241,7 +241,9 @@ impl ClaudeProvider {
         tracing::debug!("Response status: {}", status);
 
         if status == reqwest::StatusCode::UNAUTHORIZED {
-            return Err(ProviderError::AuthFailed("OAuth token expired or invalid".into()));
+            return Err(ProviderError::AuthFailed(
+                "OAuth token expired or invalid".into(),
+            ));
         }
 
         if status == reqwest::StatusCode::FORBIDDEN {
@@ -258,7 +260,9 @@ impl ClaudeProvider {
                 tracing::info!("Returning cached snapshot after rate limit");
                 return Ok(cached);
             }
-            return Err(ProviderError::RateLimit("Rate limited. Please try again later.".into()));
+            return Err(ProviderError::RateLimit(
+                "Rate limited. Please try again later.".into(),
+            ));
         }
 
         if !status.is_success() {
@@ -276,7 +280,10 @@ impl ClaudeProvider {
     }
 
     /// Parses OAuth usage response into UsageSnapshot
-    fn parse_oauth_usage(&self, data: ClaudeOAuthUsageResponse) -> Result<UsageSnapshot, ProviderError> {
+    fn parse_oauth_usage(
+        &self,
+        data: ClaudeOAuthUsageResponse,
+    ) -> Result<UsageSnapshot, ProviderError> {
         let mut snapshot = UsageSnapshot::new();
 
         // 5-hour session limit (primary)
@@ -314,8 +321,7 @@ impl ClaudeProvider {
         // 7-day Sonnet limit (tertiary) - optional model-specific limit
         if let Some(sonnet) = data.seven_day_sonnet {
             if let Some(pct) = sonnet.utilization {
-                let mut window = RateWindow::new(pct)
-                    .with_reset_description("Sonnet limit");
+                let mut window = RateWindow::new(pct).with_reset_description("Sonnet limit");
 
                 if let Some(resets_str) = sonnet.resets_at {
                     if let Ok(resets) = chrono::DateTime::parse_from_rfc3339(&resets_str) {
@@ -376,7 +382,10 @@ impl Provider for ClaudeProvider {
             if let Some(t) = *last_time {
                 if t.elapsed().as_secs() < MIN_FETCH_INTERVAL_SECS {
                     if let Some(cached) = self.last_snapshot.read().await.clone() {
-                        tracing::debug!("Returning cached snapshot ({}s since last fetch)", t.elapsed().as_secs());
+                        tracing::debug!(
+                            "Returning cached snapshot ({}s since last fetch)",
+                            t.elapsed().as_secs()
+                        );
                         return Ok(cached);
                     }
                 }
@@ -411,7 +420,7 @@ impl Provider for ClaudeProvider {
 
         // Open Claude Code login page or instructions
         // The user needs to run `claude login` in their terminal
-        if let Err(e) = opener::open("https://claude.ai/login") {
+        if let Err(e) = tauri_plugin_opener::open_url("https://claude.ai/login", None::<&str>) {
             tracing::warn!("Failed to open browser: {}", e);
         }
 
@@ -425,7 +434,9 @@ impl Provider for ClaudeProvider {
         *self.oauth_token.write().await = None;
         *self.last_snapshot.write().await = None;
 
-        tracing::info!("Cleared cached OAuth token. Note: This doesn't logout from Claude Code CLI.");
+        tracing::info!(
+            "Cleared cached OAuth token. Note: This doesn't logout from Claude Code CLI."
+        );
         Ok(())
     }
 
@@ -565,7 +576,7 @@ mod tests {
                                 if let Some(oauth) = &creds.claude_ai_oauth {
                                     println!("Has claudeAiOauth");
                                     if let Some(token) = &oauth.access_token {
-                                        println!("Has access_token: {}...", &token[..20.min(token.len())]);
+                                        println!("Has access_token (present)");
                                         assert!(token.starts_with("sk-ant-"));
                                     } else {
                                         println!("No access_token found");
@@ -598,7 +609,7 @@ mod tests {
         let token = provider.load_oauth_token().await;
 
         if let Some(t) = &token {
-            println!("Found token: {}...", &t[..20.min(t.len())]);
+            println!("Found token (present)");
             assert!(t.starts_with("sk-ant-"));
         } else {
             println!("No token found - this test passes if no Claude Code credentials exist");

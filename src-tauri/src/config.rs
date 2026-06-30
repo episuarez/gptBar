@@ -13,9 +13,31 @@ use std::path::PathBuf;
 pub struct ProviderSettings {
     /// Whether this provider is enabled
     pub enabled: bool,
-    /// API key for providers that need it (OpenAI, Gemini)
+    /// API key for providers that need it (OpenAI, Gemini).
+    ///
+    /// Secrets are NOT persisted here anymore: they live only in the OS
+    /// keychain. This field is kept for backward-compatible reads of older
+    /// config files; new keys are never written into it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_key: Option<String>,
+}
+
+/// Maps a provider id to its OS keychain service name.
+///
+/// Centralizes the service name so the command that stores a key and the
+/// provider that reads it always agree. Without this they drifted apart
+/// (UI stored under "gemini" while the provider read "google-gemini").
+///
+/// Note: Claude is intentionally absent — it reads Claude Code CLI's own
+/// external credential store ("Claude Code-credentials"), not a gptbar key.
+pub fn keychain_service(provider_id: &str) -> &'static str {
+    match provider_id {
+        "gemini" => "google-gemini",
+        "codex" => "codex-cli",
+        "openai" => "openai",
+        "xai" => "xai",
+        _ => "gptbar",
+    }
 }
 
 /// Application configuration
@@ -66,12 +88,18 @@ impl Default for AppConfig {
         let mut provider_settings = HashMap::new();
         provider_settings.insert(
             "claude".to_string(),
-            ProviderSettings { enabled: true, api_key: None },
+            ProviderSettings {
+                enabled: true,
+                api_key: None,
+            },
         );
         for id in &["openai", "gemini", "codex", "xai"] {
             provider_settings.insert(
                 id.to_string(),
-                ProviderSettings { enabled: false, api_key: None },
+                ProviderSettings {
+                    enabled: false,
+                    api_key: None,
+                },
             );
         }
 
@@ -115,7 +143,11 @@ impl AppConfig {
             std::env::var("XDG_CONFIG_HOME")
                 .ok()
                 .map(PathBuf::from)
-                .or_else(|| std::env::var("HOME").ok().map(|p| PathBuf::from(p).join(".config")))
+                .or_else(|| {
+                    std::env::var("HOME")
+                        .ok()
+                        .map(|p| PathBuf::from(p).join(".config"))
+                })
                 .map(|p| p.join("gptbar"))
         }
 
@@ -261,8 +293,7 @@ impl AppConfig {
 
     #[cfg(target_os = "macos")]
     pub fn set_autostart(&self) -> Result<(), String> {
-        let plist_path =
-            Self::launch_agent_path().ok_or("Could not determine LaunchAgent path")?;
+        let plist_path = Self::launch_agent_path().ok_or("Could not determine LaunchAgent path")?;
 
         if self.start_on_login {
             let exe_path =
@@ -321,7 +352,11 @@ impl AppConfig {
         std::env::var("XDG_CONFIG_HOME")
             .ok()
             .map(PathBuf::from)
-            .or_else(|| std::env::var("HOME").ok().map(|p| PathBuf::from(p).join(".config")))
+            .or_else(|| {
+                std::env::var("HOME")
+                    .ok()
+                    .map(|p| PathBuf::from(p).join(".config"))
+            })
             .map(|p| p.join("autostart/gptbar.desktop"))
     }
 
@@ -366,9 +401,7 @@ X-GNOME-Autostart-enabled=true
 
     #[cfg(target_os = "linux")]
     pub fn is_autostart_enabled() -> bool {
-        Self::autostart_path()
-            .map(|p| p.exists())
-            .unwrap_or(false)
+        Self::autostart_path().map(|p| p.exists()).unwrap_or(false)
     }
 
     // Fallback for other platforms
@@ -404,9 +437,11 @@ mod tests {
 
     #[test]
     fn test_serialize_deserialize_with_thresholds() {
-        let mut config = AppConfig::default();
-        config.warning_threshold = 85.0;
-        config.critical_threshold = 98.0;
+        let config = AppConfig {
+            warning_threshold: 85.0,
+            critical_threshold: 98.0,
+            ..Default::default()
+        };
 
         let json = serde_json::to_string(&config).unwrap();
         let loaded: AppConfig = serde_json::from_str(&json).unwrap();
@@ -431,8 +466,10 @@ mod tests {
 
     #[test]
     fn test_validate_refresh_interval_warning() {
-        let mut config = AppConfig::default();
-        config.refresh_interval = 3;
+        let config = AppConfig {
+            refresh_interval: 3,
+            ..Default::default()
+        };
         let warning = config.validate_refresh_interval();
         assert!(warning.is_some());
         assert!(warning.unwrap().contains("rate limiting"));
@@ -447,10 +484,12 @@ mod tests {
 
     #[test]
     fn test_serialize_deserialize() {
-        let mut config = AppConfig::default();
-        config.refresh_interval = 10;
-        config.start_on_login = true;
-        config.enabled_providers = vec!["claude".to_string(), "openai".to_string()];
+        let config = AppConfig {
+            refresh_interval: 10,
+            start_on_login: true,
+            enabled_providers: vec!["claude".to_string(), "openai".to_string()],
+            ..Default::default()
+        };
 
         let json = serde_json::to_string(&config).unwrap();
         let loaded: AppConfig = serde_json::from_str(&json).unwrap();

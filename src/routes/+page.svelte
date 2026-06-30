@@ -4,6 +4,8 @@
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import ProviderCard from '$lib/components/ProviderCard.svelte';
   import ProviderTabs from '$lib/components/ProviderTabs.svelte';
+  import UpdateBanner from '$lib/components/UpdateBanner.svelte';
+  import { ensureNotificationPermission, maybeNotifyUsage } from '$lib/notifications';
   import type { UsageSnapshot, ProviderState, AppConfig } from '$lib/types';
 
   // All available providers with their display names
@@ -19,6 +21,9 @@
   let providerStates = $state<Record<string, ProviderState>>({});
   let enabledProviders = $state<string[]>(['claude']);
   let activeProvider = $state('claude');
+
+  // Full config, used for notification thresholds / cooldown / mutes.
+  let appConfig = $state<AppConfig | null>(null);
 
   // Reference to close modals
   let closeModals: (() => void) | null = $state(null);
@@ -37,6 +42,14 @@
     if (maxPercent >= 85) return 'warning';
     return 'normal';
   });
+
+  let statusLabel = $derived(
+    usageStatus === 'critical'
+      ? 'Usage critical'
+      : usageStatus === 'warning'
+        ? 'Usage warning'
+        : 'Usage normal'
+  );
 
   // Header subtitle
   let headerSubtitle = $derived(
@@ -75,6 +88,7 @@
   async function loadConfig() {
     try {
       const config = await invoke<AppConfig>('get_config');
+      appConfig = config;
       enabledProviders = config.enabled_providers.length > 0
         ? config.enabled_providers
         : ['claude'];
@@ -104,6 +118,7 @@
     try {
       const snapshot = await invoke<UsageSnapshot>('fetch_provider_usage', { providerId });
       updateProviderState(providerId, { snapshot, loading: false });
+      maybeNotifyUsage(providerId, providerNames[providerId] || providerId, snapshot, appConfig);
     } catch (e) {
       updateProviderState(providerId, { error: String(e), loading: false });
       console.error(`Failed to fetch usage for ${providerId}:`, e);
@@ -191,9 +206,13 @@
   onMount(() => {
     let unlistenFocus: (() => void) | null = null;
     let interval: ReturnType<typeof setInterval> | null = null;
+    let destroyed = false;
 
     // Initialize everything
     (async () => {
+      // Request notification permission up front
+      await ensureNotificationPermission();
+
       // Load config first
       await loadConfig();
 
@@ -217,17 +236,28 @@
           closeModals();
         }
       });
+      // Component was unmounted before listener resolved — clean up immediately
+      if (destroyed) {
+        unlistenFocus();
+        unlistenFocus = null;
+        return;
+      }
 
-      // Refresh active provider every 5 minutes
+      // Refresh every 5 minutes. Refresh all enabled providers (not just the
+      // active one) so the tray status and threshold notifications stay current.
       interval = setInterval(async () => {
-        const state = providerStates[activeProvider];
-        if (state?.isAvailable) {
-          await fetchProviderUsage(activeProvider);
+        if (destroyed) return;
+        await loadConfig();
+        for (const providerId of enabledProviders) {
+          if (providerStates[providerId]?.isAvailable) {
+            await fetchProviderUsage(providerId);
+          }
         }
       }, 5 * 60 * 1000);
     })();
 
     return () => {
+      destroyed = true;
       if (interval) clearInterval(interval);
       if (unlistenFocus) unlistenFocus();
     };
@@ -235,6 +265,7 @@
 </script>
 
 <main class="container">
+  <UpdateBanner />
   <header class="app-header">
     <div class="header-left">
       <div class="header-icon">
@@ -277,7 +308,7 @@
           <path d="M13.65 2.35A7.96 7.96 0 0 0 8 0a8 8 0 1 0 8 8h-2a6 6 0 1 1-1.76-4.24L9 7h7V0l-2.35 2.35z" fill="currentColor"/>
         </svg>
       </button>
-      <div class="header-dot status-{usageStatus}"></div>
+      <div class="header-dot status-{usageStatus}" role="img" title={statusLabel} aria-label={statusLabel}></div>
     </div>
   </header>
 
@@ -390,7 +421,7 @@
     font-family: 'Inter', sans-serif;
     font-size: 11px;
     font-weight: 400;
-    color: #64748B;
+    color: #94A3B8;
     line-height: 1.2;
   }
 
@@ -446,11 +477,24 @@
   .header-dot.status-warning {
     background: #F59E0B;
     box-shadow: 0 0 6px rgba(245, 158, 11, 0.4);
+    animation: dot-pulse 1.8s ease-in-out infinite;
   }
 
   .header-dot.status-critical {
     background: #EF4444;
     box-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
+    animation: dot-pulse 1s ease-in-out infinite;
+  }
+
+  @keyframes dot-pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 0.85;
+    }
+    50% {
+      transform: scale(1.3);
+      opacity: 1;
+    }
   }
 
   @keyframes spin {
@@ -460,5 +504,23 @@
 
   :global(.spinning) {
     animation: spin 0.8s linear infinite;
+  }
+
+  .container {
+    animation: app-fade-in 0.35s ease-out both;
+  }
+
+  @keyframes app-fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .container,
+    .header-dot.status-warning,
+    .header-dot.status-critical,
+    :global(.spinning) {
+      animation: none;
+    }
   }
 </style>

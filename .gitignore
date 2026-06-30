@@ -10,7 +10,7 @@ node_modules/
 # Rust/Cargo
 /src-tauri/target/
 **/*.rs.bk
-Cargo.lock
+# Cargo.lock is committed (binary app) for reproducible builds
 
 # Environment variables
 .env
@@ -69,3 +69,13 @@ CLAUDE.md.bak
 .claude-flow/
 .claude/init-snapshot.json
 settings.json.bak
+
+# Claude Code tooling
+CLAUDE.md
+CLAUDE.md.*.bak
+.codebase-memory/
+.agents/
+skills-lock.json
+
+# Design source (not for distribution)
+*.pen

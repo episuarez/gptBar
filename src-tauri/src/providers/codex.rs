@@ -94,7 +94,11 @@ impl CodexProvider {
             std::env::var("XDG_CONFIG_HOME")
                 .ok()
                 .map(PathBuf::from)
-                .or_else(|| std::env::var("HOME").ok().map(|p| PathBuf::from(p).join(".config")))
+                .or_else(|| {
+                    std::env::var("HOME")
+                        .ok()
+                        .map(|p| PathBuf::from(p).join(".config"))
+                })
                 .map(|p| p.join("codex"))
         }
 
@@ -150,7 +154,9 @@ impl CodexProvider {
         }
 
         // Try system keychain
-        if let Ok(entry) = keyring::Entry::new("codex-cli", "api_key") {
+        if let Ok(entry) =
+            keyring::Entry::new(crate::config::keychain_service(self.id()), "api_key")
+        {
             if let Ok(key) = entry.get_password() {
                 tracing::info!("Found Codex API key from system keychain");
                 *self.api_key.write().await = Some(key.clone());
@@ -197,9 +203,7 @@ impl CodexProvider {
         let identity = IdentitySnapshot::new().with_plan("Connected");
 
         snapshot = snapshot
-            .with_primary(
-                RateWindow::new(0.0).with_reset_description("Uses OpenAI API"),
-            )
+            .with_primary(RateWindow::new(0.0).with_reset_description("Uses OpenAI API"))
             .with_identity(identity);
 
         Ok(snapshot)
@@ -243,7 +247,9 @@ impl Provider for CodexProvider {
 
     async fn login(&self) -> Result<bool, ProviderError> {
         // Open Codex CLI docs or OpenAI API keys page
-        if let Err(e) = opener::open("https://platform.openai.com/api-keys") {
+        if let Err(e) =
+            tauri_plugin_opener::open_url("https://platform.openai.com/api-keys", None::<&str>)
+        {
             tracing::warn!("Failed to open browser: {}", e);
         }
         Ok(false)

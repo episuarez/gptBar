@@ -53,14 +53,14 @@ mod windows_impl {
             }
 
             unsafe {
-                let mut blob_in = CRYPT_INTEGER_BLOB {
+                let blob_in = CRYPT_INTEGER_BLOB {
                     cbData: data.len() as u32,
                     pbData: data.as_ptr() as *mut u8,
                 };
                 let mut blob_out = CRYPT_INTEGER_BLOB::default();
 
                 let result = CryptProtectData(
-                    &mut blob_in,
+                    &blob_in,
                     None,
                     None,
                     None,
@@ -96,14 +96,14 @@ mod windows_impl {
             }
 
             unsafe {
-                let mut blob_in = CRYPT_INTEGER_BLOB {
+                let blob_in = CRYPT_INTEGER_BLOB {
                     cbData: encrypted.len() as u32,
                     pbData: encrypted.as_ptr() as *mut u8,
                 };
                 let mut blob_out = CRYPT_INTEGER_BLOB::default();
 
                 let result = CryptUnprotectData(
-                    &mut blob_in,
+                    &blob_in,
                     None,
                     None,
                     None,

@@ -51,9 +51,7 @@ pub struct SecureStore {
 impl SecureStore {
     /// Creates a new SecureStore with the default service name
     pub fn new() -> Self {
-        Self {
-            service: "GPTBar",
-        }
+        Self { service: "GPTBar" }
     }
 
     /// Creates a new SecureStore with a custom service name
@@ -130,11 +128,7 @@ impl SecureStore {
     /// # Returns
     ///
     /// `true` if the token was stored (didn't exist), `false` if it already existed
-    pub fn set_token_if_absent(
-        &self,
-        key: &str,
-        token: &str,
-    ) -> Result<bool, SecureStoreError> {
+    pub fn set_token_if_absent(&self, key: &str, token: &str) -> Result<bool, SecureStoreError> {
         if self.has_token(key)? {
             Ok(false)
         } else {
@@ -267,12 +261,18 @@ mod tests {
 
         // First set should succeed
         assert!(store.set_token_if_absent(test_key, "first").unwrap());
-        assert_eq!(store.get_token(test_key).unwrap(), Some("first".to_string()));
+        assert_eq!(
+            store.get_token(test_key).unwrap(),
+            Some("first".to_string())
+        );
 
         // Second set should fail (already exists)
         assert!(!store.set_token_if_absent(test_key, "second").unwrap());
         // Value should still be "first"
-        assert_eq!(store.get_token(test_key).unwrap(), Some("first".to_string()));
+        assert_eq!(
+            store.get_token(test_key).unwrap(),
+            Some("first".to_string())
+        );
 
         // Clean up
         store.delete_token(test_key).unwrap();
@@ -294,7 +294,10 @@ mod tests {
 
         // Update should succeed
         assert!(store.update_token(test_key, "updated").unwrap());
-        assert_eq!(store.get_token(test_key).unwrap(), Some("updated".to_string()));
+        assert_eq!(
+            store.get_token(test_key).unwrap(),
+            Some("updated".to_string())
+        );
 
         // Clean up
         store.delete_token(test_key).unwrap();
@@ -310,11 +313,17 @@ mod tests {
 
         // Store initial value
         store.set_token(test_key, "first").unwrap();
-        assert_eq!(store.get_token(test_key).unwrap(), Some("first".to_string()));
+        assert_eq!(
+            store.get_token(test_key).unwrap(),
+            Some("first".to_string())
+        );
 
         // Overwrite
         store.set_token(test_key, "second").unwrap();
-        assert_eq!(store.get_token(test_key).unwrap(), Some("second".to_string()));
+        assert_eq!(
+            store.get_token(test_key).unwrap(),
+            Some("second".to_string())
+        );
 
         // Clean up
         store.delete_token(test_key).unwrap();

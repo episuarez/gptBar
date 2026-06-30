@@ -11,10 +11,10 @@ mod base;
 mod claude;
 mod codex;
 mod gemini;
-mod openai;
-mod xai;
 #[cfg(test)]
 mod integration_tests;
+mod openai;
+mod xai;
 
 pub use base::*;
 pub use claude::ClaudeProvider;

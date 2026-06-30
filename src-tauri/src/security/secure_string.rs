@@ -40,6 +40,7 @@ impl SecureString {
     ///
     /// Note: This creates a copy of the data. If you already have a String,
     /// prefer using `new()` to avoid an extra copy.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
         Self {
             inner: s.to_string(),
@@ -311,7 +312,8 @@ mod tests {
     fn test_secure_string_eq_str() {
         let secret = SecureString::new("password".to_string());
         assert!(secret == "password");
-        assert!(secret == String::from("password"));
+        let owned = String::from("password");
+        assert!(secret == owned);
         assert!(secret != "other");
     }
 

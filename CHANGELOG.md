@@ -25,8 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Auto-refresh now polls every enabled provider so the tray and notifications
   stay current for all of them
 - Release workflow signs updater artifacts and publishes `latest.json`
+- Bumped Tauri to 2.11 and aligned the JS/Rust package versions
+- CI: `actions/checkout` and `actions/setup-node` upgraded to v5; installs use
+  `npm ci` against the committed lockfile
 
 ### Fixed
+- Release build failed on a Tauri package version mismatch (npm vs Rust crate)
 - Gemini API key no longer sent in the request URL (moved to header)
 - API keys are stored only in the Windows Credential Manager, never written to
   `config.json` in plaintext

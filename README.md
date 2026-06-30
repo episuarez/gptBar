@@ -82,6 +82,10 @@ scripts\build.bat    :: production build → src-tauri/target/release/bundle/
 
 Rust · [Tauri 2](https://tauri.app) · [Svelte 5](https://svelte.dev) · TypeScript — a native shell with a web UI, no Electron bloat.
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release notes. Latest: **v0.2.2** — auto-update, desktop notifications, in-app update checks and a UI polish pass.
+
 ## Contributing
 
 PRs and issues welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
